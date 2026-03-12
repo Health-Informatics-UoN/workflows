@@ -1,0 +1,10 @@
+name: Dependency Review (self)
+
+on:
+  pull_request:
+
+jobs:
+  dependency-review:
+    uses: ./.github/workflows/dependency-review.yml
+    secrets: inherit
+

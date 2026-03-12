@@ -1,0 +1,10 @@
+name: PR Title Check (self)
+
+on:
+  pull_request:
+
+jobs:
+  pr-title:
+    uses: ./.github/workflows/pr-title.yml
+    secrets: inherit
+
