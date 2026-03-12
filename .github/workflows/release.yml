@@ -1,0 +1,14 @@
+name: Release (self)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    uses: ./.github/workflows/semantic-release.yml
+    with:
+      node-version: '20'
+    secrets: inherit
+
