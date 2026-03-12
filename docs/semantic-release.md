@@ -4,7 +4,7 @@ Reusable workflow that runs [semantic-release](https://github.com/semantic-relea
 
 ## Inputs
 
-| Input           | Required | Default | Description                |
+| Input          | Required | Default | Description                |
 |----------------|----------|---------|----------------------------|
 | `node-version` | No       | `'24'`  | Node.js version to use.    |
 
@@ -41,7 +41,7 @@ module.exports = {
     "branches": ["main"],
     "tagFormat": "${version}",
     "preset": "angular",
-    "repositoryUrl": "https://github.com/Health-Informatics-UoN/nuh-helper.git",
+    "repositoryUrl": "https://github.com/Health-Informatics-UoN/[REPO_NAME].git",
     plugins: [
       '@semantic-release/commit-analyzer',
       '@semantic-release/release-notes-generator',
@@ -51,3 +51,27 @@ module.exports = {
     "initialVersion": "0.0.1"
 };
 ```
+
+## Python Configuration
+
+In `pyproject.toml` use `hatch-vcs` for a dynamic version.
+
+```toml copy
+dynamic = ["version"]
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+```
+
+## C# Configuration
+
+TODO
+
+## Javascript Configuration
+
+TODO
