@@ -1,0 +1,77 @@
+name: Publish Semver Container
+
+on:
+  workflow_call:
+    inputs:
+      image-name:
+        description: 'Container image name (e.g. my-app)'
+        required: true
+        type: string
+      registry:
+        description: 'Container registry host (e.g. ghcr.io)'
+        required: false
+        default: 'ghcr.io'
+        type: string
+      release-name-prefix:
+        description: 'Prefix for the GitHub Release title'
+        required: false
+        default: ''
+        type: string
+
+env:
+  image-name: ${{ inputs.image-name }}
+  registry: ${{ inputs.registry }}
+  release-name-prefix: ${{ inputs.release-name-prefix }}
+
+jobs:
+  version-tag:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write # container images
+      contents: write # releases
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      # some docker actions need all lowercase
+      - name: downcase repo-owner
+        run: |
+          echo "REPO_OWNER_LOWER=${GITHUB_REPOSITORY_OWNER,,}" >>${GITHUB_ENV}
+
+      - name: Parse version from tag
+        id: version
+        uses: release-kit/semver@97491c46500b6e758ced599794164a234b8aa08c # v2.0.7
+
+      # check image exists for commit
+      - uses: tyriis/docker-image-tag-exists@71a750a41aa78e4efb0842f538140c5df5b8166f # v2.1.0
+        with:
+          registry: ${{ env.registry }}
+          repository: ${{ env.REPO_OWNER_LOWER }}/${{ env.image-name }}
+          tag: ${{ github.sha }}
+
+      # standard login to the container registry
+      - name: Docker Login
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
+        with:
+          registry: ${{ env.registry }}
+          username: ${{github.actor}}
+          password: ${{secrets.GITHUB_TOKEN}}
+
+      # We still use the metadata action to help build out our tags from the Workflow Run
+      - name: Docker Metadata action
+        id: meta
+        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
+        with:
+          images: ${{ env.registry }}/${{ env.REPO_OWNER_LOWER }}/${{ env.image-name }}
+          tags: | # new tags only
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      # apply the new tags to the existing images
+      - name: Push updated image tags
+        uses: akhilerm/tag-push-action@f35ff2cb99d407368b5c727adbcc14a2ed81d509 # v2.2.0
+        with:
+          src: ${{ env.registry }}/${{ env.REPO_OWNER_LOWER }}/${{ env.image-name }}:${{ github.sha }}
+          dst: |
+            ${{ steps.meta.outputs.tags }}
