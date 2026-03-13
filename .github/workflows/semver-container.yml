@@ -17,17 +17,11 @@ on:
         required: false
         default: ''
         type: string
-      container-link:
-        description: 'URL to the container package page for release body'
-        required: false
-        default: ''
-        type: string
 
 env:
   image-name: ${{ inputs.image-name }}
   registry: ${{ inputs.registry }}
   release-name-prefix: ${{ inputs.release-name-prefix }}
-  container-link: ${{ inputs.container-link }}
 
 jobs:
   version-tag:
