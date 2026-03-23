@@ -8,6 +8,10 @@ on:
         required: false
         default: '24'
         type: string
+    outputs:
+      release-created:
+        description: 'Whether semantic-release created a new release/tag'
+        value: ${{ jobs.release.outputs.release-created }}
 
 permissions:
   contents: write
@@ -17,10 +21,14 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      release-created: ${{ steps.release-check.outputs.release-created }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -36,8 +44,33 @@ jobs:
             @semantic-release/changelog \
             @semantic-release/github
 
+      - name: Capture latest tag before release
+        id: tag-before
+        run: |
+          git fetch --tags --force
+          # Pick the most recently created tag (more reliable than `git describe`).
+          before_tag="$(git for-each-ref --sort=-creatordate --format '%(refname:short)' refs/tags | head -n 1 2>/dev/null || true)"
+          echo "tag=${before_tag}" >> "$GITHUB_OUTPUT"
+
       - name: Run Semantic Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: semantic-release
+
+      - name: Capture latest tag after release
+        id: tag-after
+        run: |
+          git fetch --tags --force
+          # Pick the most recently created tag (more reliable than `git describe`).
+          after_tag="$(git for-each-ref --sort=-creatordate --format '%(refname:short)' refs/tags | head -n 1 2>/dev/null || true)"
+          echo "tag=${after_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Determine whether release was created
+        id: release-check
+        run: |
+          if [ "${{ steps.tag-before.outputs.tag }}" != "${{ steps.tag-after.outputs.tag }}" ]; then
+            echo "release-created=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release-created=false" >> "$GITHUB_OUTPUT"
+          fi
 
