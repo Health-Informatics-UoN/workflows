@@ -44,31 +44,26 @@ jobs:
             @semantic-release/changelog \
             @semantic-release/github
 
-      - name: Capture latest tag before release
-        id: tag-before
+      - name: Capture tags before release
         run: |
           git fetch --tags --force
-          # Pick the most recently created tag (more reliable than `git describe`).
-          before_tag="$(git for-each-ref --sort=-creatordate --format '%(refname:short)' refs/tags | head -n 1 2>/dev/null || true)"
-          echo "tag=${before_tag}" >> "$GITHUB_OUTPUT"
+          git tag -l | sort > /tmp/tags-before.txt
 
       - name: Run Semantic Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: semantic-release
 
-      - name: Capture latest tag after release
-        id: tag-after
+      - name: Capture tags after release
         run: |
           git fetch --tags --force
-          # Pick the most recently created tag (more reliable than `git describe`).
-          after_tag="$(git for-each-ref --sort=-creatordate --format '%(refname:short)' refs/tags | head -n 1 2>/dev/null || true)"
-          echo "tag=${after_tag}" >> "$GITHUB_OUTPUT"
+          git tag -l | sort > /tmp/tags-after.txt
 
       - name: Determine whether release was created
         id: release-check
         run: |
-          if [ "${{ steps.tag-before.outputs.tag }}" != "${{ steps.tag-after.outputs.tag }}" ]; then
+          new_tags=$(comm -13 /tmp/tags-before.txt /tmp/tags-after.txt)
+          if [ -n "$new_tags" ]; then
             echo "release-created=true" >> "$GITHUB_OUTPUT"
           else
             echo "release-created=false" >> "$GITHUB_OUTPUT"
