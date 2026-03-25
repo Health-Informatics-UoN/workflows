@@ -1,0 +1,94 @@
+name: Upload Python Package
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: 'Python version to build with'
+        required: false
+        default: '3.x'
+        type: string
+      package-name:
+        description: 'PyPI package name, used to construct the PyPI URL (e.g. my-package)'
+        required: true
+        type: string
+      environment-name:
+        description: 'GitHub environment to use for the PyPI publish job'
+        required: false
+        default: 'pypi'
+        type: string
+      working-directory:
+        description: 'Working directory for the build, relative to the repo root. Useful for monorepos.'
+        required: false
+        default: '.'
+        type: string
+      use-uv:
+        description: 'Use uv to build the package instead of pip + build'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build:
+    name: Build distribution
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # Apply working-directory to all run steps in this job
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # When using uv, Python is managed by uv itself via the python-version input.
+      # When using pip, setup-python handles it instead.
+      - name: Set up Python
+        if: ${{ !inputs.use-uv }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Set up uv
+        if: inputs.use-uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Install build dependencies
+        if: ${{ !inputs.use-uv }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+
+      - name: Build package
+        run: ${{ inputs.use-uv && 'uv build' || 'python -m build' }}
+
+      - name: Store the distribution packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          # upload-artifact paths are relative to the workspace root, not working-directory,
+          # so we need to include the working-directory prefix explicitly.
+          path: ${{ inputs.working-directory }}/dist/
+
+  publish-to-pypi:
+    name: Publish Python distribution to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment-name }}
+      url: https://pypi.org/p/${{ inputs.package-name }}
+    permissions:
+      id-token: write # required for OIDC-based PyPI publishing (no API token needed)
+
+    steps:
+      - name: Download all the dists
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Publish distribution to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
