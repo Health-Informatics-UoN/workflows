@@ -8,6 +8,10 @@ on:
         required: false
         default: '24'
         type: string
+    outputs:
+      release-created:
+        description: 'Whether semantic-release created a new release/tag'
+        value: ${{ jobs.release.outputs.release-created }}
 
 permissions:
   contents: write
@@ -17,10 +21,17 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    concurrency:
+      group: semantic-release-${{ github.repository }}
+      cancel-in-progress: false
+    outputs:
+      release-created: ${{ steps.release-check.outputs.release-created }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -36,8 +47,35 @@ jobs:
             @semantic-release/changelog \
             @semantic-release/github
 
+      - name: Capture tags before release
+        run: |
+          git fetch --tags --force
+          git tag -l | sort > /tmp/tags-before.txt
+
       - name: Run Semantic Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: semantic-release
+
+      - name: Capture tags after release
+        run: |
+          git fetch --tags --force
+          git tag -l | sort > /tmp/tags-after.txt
+
+      - name: Determine whether release was created
+        id: release-check
+        run: |
+          head_sha=$(git rev-parse HEAD)
+          new_tags=$(comm -13 /tmp/tags-before.txt /tmp/tags-after.txt)
+          release_created=false
+
+          while IFS= read -r tag; do
+            tag_sha=$(git rev-parse "${tag}^{}" 2>/dev/null || git rev-parse "$tag")
+            if [ "$tag_sha" = "$head_sha" ]; then
+              release_created=true
+              break
+            fi
+          done <<< "$new_tags"
+
+          echo "release-created=$release_created" >> "$GITHUB_OUTPUT"
 

@@ -12,16 +12,10 @@ on:
         required: false
         default: 'ghcr.io'
         type: string
-      release-name-prefix:
-        description: 'Prefix for the GitHub Release title'
-        required: false
-        default: ''
-        type: string
 
 env:
   image-name: ${{ inputs.image-name }}
   registry: ${{ inputs.registry }}
-  release-name-prefix: ${{ inputs.release-name-prefix }}
 
 jobs:
   version-tag:

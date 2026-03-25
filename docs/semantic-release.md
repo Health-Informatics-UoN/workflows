@@ -8,6 +8,28 @@ Reusable workflow that runs [semantic-release](https://github.com/semantic-relea
 |----------------|----------|---------|----------------------------|
 | `node-version` | No       | `'24'`  | Node.js version to use.    |
 
+## Outputs
+
+| Output            | Description                                              |
+|-------------------|----------------------------------------------------------|
+| `release-created` | `'true'` if a new release was created, `'false'` if not. |
+
+Use this to conditionally run downstream jobs (e.g. re-tag a container, publish to PyPI) only when a release actually happened:
+
+```yaml
+jobs:
+  release:
+    uses: health-informatics-uon/workflows/.github/workflows/semantic-release.yml@main
+    secrets: inherit
+
+  publish:
+    needs: release
+    if: needs.release.outputs.release-created == 'true'
+    ...
+```
+
+> **Note:** If the workflow itself errors, `release-created` will be an empty string rather than `'false'`. Always use `== 'true'` rather than `!= 'false'` in conditions.
+
 ## Secrets
 
 - `GITHUB_TOKEN` — Pass with `secrets: inherit` (or set explicitly) so the workflow can create releases and comment on PRs/issues.
