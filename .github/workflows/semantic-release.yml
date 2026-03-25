@@ -21,6 +21,9 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    concurrency:
+      group: semantic-release-${{ github.repository }}
+      cancel-in-progress: false
     outputs:
       release-created: ${{ steps.release-check.outputs.release-created }}
 
@@ -62,10 +65,17 @@ jobs:
       - name: Determine whether release was created
         id: release-check
         run: |
+          head_sha=$(git rev-parse HEAD)
           new_tags=$(comm -13 /tmp/tags-before.txt /tmp/tags-after.txt)
-          if [ -n "$new_tags" ]; then
-            echo "release-created=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "release-created=false" >> "$GITHUB_OUTPUT"
-          fi
+          release_created=false
+
+          while IFS= read -r tag; do
+            tag_sha=$(git rev-parse "${tag}^{}" 2>/dev/null || git rev-parse "$tag")
+            if [ "$tag_sha" = "$head_sha" ]; then
+              release_created=true
+              break
+            fi
+          done <<< "$new_tags"
+
+          echo "release-created=$release_created" >> "$GITHUB_OUTPUT"
 
