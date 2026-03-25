@@ -10,11 +10,12 @@ Reusable workflow that runs [semantic-release](https://github.com/semantic-relea
 
 ## Outputs
 
-| Output            | Description                                              |
-|-------------------|----------------------------------------------------------|
-| `release-created` | `'true'` if a new release was created, `'false'` if not. |
+| Output            | Description                                                              |
+|-------------------|--------------------------------------------------------------------------|
+| `release-created` | `'true'` if a new release was created, `'false'` if not.                 |
+| `release-tag`     | The tag created by semantic-release (e.g. `1.2.3`). Empty string if no release was created. |
 
-Use this to conditionally run downstream jobs (e.g. re-tag a container, publish to PyPI) only when a release actually happened:
+Use these to conditionally run downstream jobs (e.g. re-tag a container, publish to PyPI) only when a release actually happened:
 
 ```yaml
 jobs:
@@ -25,7 +26,11 @@ jobs:
   publish:
     needs: release
     if: needs.release.outputs.release-created == 'true'
-    ...
+    uses: health-informatics-uon/workflows/.github/workflows/semver-container.yml@main
+    with:
+      image-name: my-app
+      tag: ${{ needs.release.outputs.release-tag }}
+    secrets: inherit
 ```
 
 > **Note:** If the workflow itself errors, `release-created` will be an empty string rather than `'false'`. Always use `== 'true'` rather than `!= 'false'` in conditions.

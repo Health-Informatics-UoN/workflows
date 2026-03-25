@@ -12,6 +12,9 @@ on:
       release-created:
         description: 'Whether semantic-release created a new release/tag'
         value: ${{ jobs.release.outputs.release-created }}
+      release-tag:
+        description: 'The tag created by semantic-release (empty if no release was created)'
+        value: ${{ jobs.release.outputs.release-tag }}
 
 permissions:
   contents: write
@@ -21,16 +24,21 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # Prevent concurrent releases from the same repository. A queued run will wait
+    # rather than being cancelled, ensuring no release commit is ever skipped.
     concurrency:
       group: semantic-release-${{ github.repository }}
       cancel-in-progress: false
     outputs:
       release-created: ${{ steps.release-check.outputs.release-created }}
+      release-tag: ${{ steps.release-check.outputs.release-tag }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          # Full history is required — semantic-release reads all commits since the last
+          # tag to determine the next version and generate the changelog.
           fetch-depth: 0
 
       - name: Set up Node.js
@@ -47,6 +55,8 @@ jobs:
             @semantic-release/changelog \
             @semantic-release/github
 
+      # Snapshot the current tags before running semantic-release so we can diff
+      # afterwards to find exactly which tag (if any) was newly created.
       - name: Capture tags before release
         run: |
           git fetch --tags --force
@@ -62,20 +72,39 @@ jobs:
           git fetch --tags --force
           git tag -l | sort > /tmp/tags-after.txt
 
+      # semantic-release does not reliably expose whether it created a release via exit
+      # codes or stdout — behaviour varies across plugin configurations. Instead we diff
+      # the tag snapshots taken before and after, then check whether any new tag points
+      # at HEAD. This approach works regardless of the release.config.js in the caller repo.
       - name: Determine whether release was created
         id: release-check
         run: |
           head_sha=$(git rev-parse HEAD)
+
+          # comm -13 outputs lines present in the second file but not the first,
+          # i.e. tags that did not exist before semantic-release ran.
           new_tags=$(comm -13 /tmp/tags-before.txt /tmp/tags-after.txt)
           release_created=false
+          release_tag=""
+
+          # Short-circuit if no new tags were created at all.
+          if [ -z "$new_tags" ]; then
+            echo "release-created=false" >> "$GITHUB_OUTPUT"
+            echo "release-tag=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           while IFS= read -r tag; do
+            # Lightweight tags point directly to a commit; annotated tags point to a tag
+            # object which in turn points to a commit. The '^{}' suffix dereferences an
+            # annotated tag to its underlying commit SHA so both cases are handled uniformly.
             tag_sha=$(git rev-parse "${tag}^{}" 2>/dev/null || git rev-parse "$tag")
             if [ "$tag_sha" = "$head_sha" ]; then
               release_created=true
+              release_tag="$tag"
               break
             fi
           done <<< "$new_tags"
 
           echo "release-created=$release_created" >> "$GITHUB_OUTPUT"
-
+          echo "release-tag=$release_tag" >> "$GITHUB_OUTPUT"

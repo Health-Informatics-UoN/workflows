@@ -12,6 +12,10 @@ on:
         required: false
         default: 'ghcr.io'
         type: string
+      tag:
+        description: 'The release tag to derive semver from (e.g. 1.2.3 or v1.2.3)'
+        required: true
+        type: string
 
 env:
   image-name: ${{ inputs.image-name }}
@@ -22,28 +26,50 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       packages: write # container images
-      contents: write # releases
     steps:
-      - name: Check out the repo
-        uses: actions/checkout@v4
-
-      # some docker actions need all lowercase
+      # docker/metadata-action and akhilerm/tag-push-action require lowercase registry paths.
+      # GITHUB_REPOSITORY_OWNER can contain uppercase letters (e.g. "Health-Informatics-UoN"),
+      # so we normalise it here and store it in GITHUB_ENV for all subsequent steps.
       - name: downcase repo-owner
         run: |
           echo "REPO_OWNER_LOWER=${GITHUB_REPOSITORY_OWNER,,}" >>${GITHUB_ENV}
 
       - name: Parse version from tag
         id: version
-        uses: release-kit/semver@97491c46500b6e758ced599794164a234b8aa08c # v2.0.7
+        run: |
+          # The tag input may optionally be prefixed with 'v' (e.g. v1.2.3).
+          # Strip it so all subsequent steps work with a bare semver string.
+          version="${{ inputs.tag }}"
+          version="${version#v}"
 
-      # check image exists for commit
-      - uses: tyriis/docker-image-tag-exists@71a750a41aa78e4efb0842f538140c5df5b8166f # v2.1.0
+          # Extract the major and minor components for floating tags (e.g. '1' and '1.2').
+          # Floating tags let consumers pin to a major or minor version without knowing
+          # the exact patch, following standard container image tagging conventions.
+          major=$(echo "$version" | cut -d. -f1)
+          minor=$(echo "$version" | cut -d. -f2)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "major=$major" >> "$GITHUB_OUTPUT"
+          echo "major-minor=$major.$minor" >> "$GITHUB_OUTPUT"
+
+          # A hyphen in the version string indicates a pre-release (e.g. 1.0.0-beta.1).
+          # Floating major/minor tags must NOT be applied to pre-releases — those tags
+          # should always point at the latest stable release, not a pre-release build.
+          if [[ "$version" == *-* ]]; then
+            echo "is-prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is-prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Verify that the edge image built from this commit SHA actually exists in the registry
+      # before attempting to retag it. Fails fast rather than producing a misleading error
+      # from the tag-push step if the publish-container workflow hasn't run yet.
+      - name: Check image exists for commit
+        uses: tyriis/docker-image-tag-exists@71a750a41aa78e4efb0842f538140c5df5b8166f # v2.1.0
         with:
           registry: ${{ env.registry }}
           repository: ${{ env.REPO_OWNER_LOWER }}/${{ env.image-name }}
           tag: ${{ github.sha }}
 
-      # standard login to the container registry
       - name: Docker Login
         uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
         with:
@@ -51,18 +77,23 @@ jobs:
           username: ${{github.actor}}
           password: ${{secrets.GITHUB_TOKEN}}
 
-      # We still use the metadata action to help build out our tags from the Workflow Run
+      # Build the list of tags to apply. We use type=raw because the version comes from
+      # the 'tag' input rather than from GITHUB_REF — this workflow is triggered via
+      # workflow_call on a branch push, so GITHUB_REF is a branch ref, not a tag ref.
+      # The major and minor floating tags are gated on is-prerelease so they are only
+      # moved forward for stable releases.
       - name: Docker Metadata action
         id: meta
         uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
         with:
           images: ${{ env.registry }}/${{ env.REPO_OWNER_LOWER }}/${{ env.image-name }}
-          tags: | # new tags only
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}
-            type=semver,pattern={{major}}.{{minor}}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=${{ steps.version.outputs.major }},enable=${{ steps.version.outputs.is-prerelease == 'false' }}
+            type=raw,value=${{ steps.version.outputs.major-minor }},enable=${{ steps.version.outputs.is-prerelease == 'false' }}
 
-      # apply the new tags to the existing images
+      # Rather than rebuilding the image, we retag the existing edge image (tagged with
+      # the commit SHA by publish-container) with the semver tags computed above.
       - name: Push updated image tags
         uses: akhilerm/tag-push-action@f35ff2cb99d407368b5c727adbcc14a2ed81d509 # v2.2.0
         with:
