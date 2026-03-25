@@ -12,3 +12,10 @@ jobs:
       node-version: '20'
     secrets: inherit
 
+  confirm-release:
+    needs: release
+    if: needs.release.outputs.release-created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "A new release was created!"
+
