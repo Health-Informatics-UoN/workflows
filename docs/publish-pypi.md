@@ -1,5 +1,8 @@
 # Publish Python Package to PyPI
 
+> [!CAUTION]
+> Don't use this workflow - reusable workflows with trusted publishing does not work. It's better to be secure (trusted publishing), than use a reusable workflow. https://github.com/pypa/gh-action-pypi-publish/issues/166
+
 Reusable workflow that builds a Python package and publishes it to [PyPI](https://pypi.org) using OIDC trusted publishing (no API token required).
 
 The workflow has two jobs:
