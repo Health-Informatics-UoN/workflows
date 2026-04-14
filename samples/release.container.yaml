@@ -1,0 +1,51 @@
+# Sample workflow for releasing a project using reusable workflows from health-informatics-uon/workflows
+# This demonstrates how to combine semantic-release, container publishing, and semver tagging
+# Customize the placeholders and values below for your specific project
+
+name: Release
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  packages: write
+  id-token: write
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    uses: health-informatics-uon/workflows/.github/workflows/semantic-release.yml@1.3.0
+    with:
+      node-version: '24'
+    secrets: inherit
+
+  publish-container:
+    uses: health-informatics-uon/workflows/.github/workflows/publish-container.yml@1.3.0
+    with:
+      # Set your container image name
+      image-name: <YOUR_IMAGE_NAME>
+      # Describe your container image
+      image-description: '<YOUR_IMAGE_DESCRIPTION>'
+      registry: ghcr.io
+      # Path to the build context (usually '.')
+      context: .
+      # Path to your Dockerfile
+      dockerfile: Dockerfile
+      # Target platforms for multi-architecture builds
+      platforms: linux/amd64,linux/arm64
+    secrets: inherit
+
+  semver-container:
+    uses: health-informatics-uon/workflows/.github/workflows/semver-container.yml@1.3.0
+    needs: [release, publish-container]
+    if: needs.release.outputs.release-created == 'true'
+    with:
+      # Your container image name (must match publish-container)
+      image-name: <YOUR_IMAGE_NAME>
+      registry: ghcr.io
+      # Release tag from semantic-release (do not change)
+      tag: ${{ needs.release.outputs.release-tag }}
+    secrets: inherit
