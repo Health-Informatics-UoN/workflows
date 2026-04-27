@@ -6,6 +6,8 @@ The idea is to provide a drop-in model for releasing software, where developers 
 
 This exists within the existing constraints of Github, mostly that [automated releases cannot trigger other workflows](https://github.com/orgs/community/discussions/25281), so by composing reusable workflows together we can achieve a full release pipeline that is still easy to understand and maintain. The workflow is also designed to be flexible, so you can easily swap out the container publishing step for other types of release artifacts if needed.
 
+Currently only Python is supported, with the intention to provide C# and Typescript soon.
+
 ## Overview
 
 The workflow performs the following steps:
@@ -21,6 +23,7 @@ The workflow performs the following steps:
 - Your repository settings should only allow squash merges, and use the PR title as the commit message for commit messages to be correctly parsed by semantic-release
 - You need a `samples/release.config.js` in your repository root to configure semantic-release
 - You need a `Dockerfile` in your repository root (or update the `dockerfile` parameter)
+- You need to follow the relevant language steps
 
 ## Workflow Jobs
 
@@ -71,6 +74,12 @@ uses: health-informatics-uon/workflows/.github/workflows/semantic-release.yml@v1
 ```
 
 Check the [releases](https://github.com/health-informatics-uon/workflows/releases) for available versions.
+
+## Languages
+
+### Python
+
+Follow the `samples/pyproject.toml` sample.
 
 ## Usage
 

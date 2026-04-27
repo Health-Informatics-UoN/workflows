@@ -1,0 +1,14 @@
+[project]
+name = "sample"
+
+# Makes the version dynamic
+dynamic = ["version"]
+
+# Adds the hatch-vcs dependency
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+# Sources the version from version control
+[tool.hatch.version]
+source = "vcs"
