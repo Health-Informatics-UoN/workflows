@@ -16,6 +16,11 @@ on:
         description: 'The release tag to derive semver from (e.g. 1.2.3 or v1.2.3)'
         required: true
         type: string
+      tag-latest:
+        description: 'Also push a latest tag (only applied to stable releases, not pre-releases)'
+        required: false
+        default: false
+        type: boolean
 
 env:
   image-name: ${{ inputs.image-name }}
@@ -91,6 +96,7 @@ jobs:
             type=raw,value=${{ steps.version.outputs.version }}
             type=raw,value=${{ steps.version.outputs.major }},enable=${{ steps.version.outputs.is-prerelease == 'false' }}
             type=raw,value=${{ steps.version.outputs.major-minor }},enable=${{ steps.version.outputs.is-prerelease == 'false' }}
+            type=raw,value=latest,enable=${{ inputs.tag-latest && steps.version.outputs.is-prerelease == 'false' }}
 
       # Rather than rebuilding the image, we retag the existing edge image (tagged with
       # the commit SHA by publish-container) with the semver tags computed above.
