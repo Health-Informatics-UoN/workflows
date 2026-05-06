@@ -1,0 +1,51 @@
+# Sample workflow for releasing a Python package to PyPI using reusable workflows from health-informatics-uon/workflows
+# This demonstrates how to combine semantic-release with PyPI trusted publishing (OIDC)
+# Customize the placeholders and values below for your specific project
+
+name: Release
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write # required for PyPI trusted publishing
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    uses: health-informatics-uon/workflows/.github/workflows/semantic-release.yml@1.4.0
+    with:
+      node-version: '24'
+    secrets: inherit
+
+  # PyPI trusted publishing (OIDC) cannot be used from within a reusable workflow.
+  # This job must stay as a direct job in this non-reusable workflow — do not extract it.
+  # See: https://github.com/pypa/gh-action-pypi-publish/issues/166
+  publish-pypi:
+    needs: release
+    if: needs.release.outputs.release-created == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      # Set your PyPI package name
+      url: https://pypi.org/p/<PACKAGE_NAME>
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Build package
+        run: |
+          pip install build
+          python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
