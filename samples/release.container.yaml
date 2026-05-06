@@ -17,18 +17,18 @@ on:
 
 jobs:
   release:
-    uses: health-informatics-uon/workflows/.github/workflows/semantic-release.yml@1.3.0
+    uses: health-informatics-uon/workflows/.github/workflows/semantic-release.yml@6411293719f0d3fc7fddb74530d4435333460e4f # v 1.4.1
     with:
-      node-version: '24'
+      node-version: "24"
     secrets: inherit
 
   publish-container:
-    uses: health-informatics-uon/workflows/.github/workflows/publish-container.yml@1.3.0
+    uses: health-informatics-uon/workflows/.github/workflows/publish-container.yml@6411293719f0d3fc7fddb74530d4435333460e4f # v 1.4.1
     with:
       # Set your container image name
       image-name: <YOUR_IMAGE_NAME>
       # Describe your container image
-      image-description: '<YOUR_IMAGE_DESCRIPTION>'
+      image-description: "<YOUR_IMAGE_DESCRIPTION>"
       registry: ghcr.io
       # Path to the build context (usually '.')
       context: .
@@ -39,7 +39,7 @@ jobs:
     secrets: inherit
 
   semver-container:
-    uses: health-informatics-uon/workflows/.github/workflows/semver-container.yml@1.3.0
+    uses: health-informatics-uon/workflows/.github/workflows/semver-container.yml@6411293719f0d3fc7fddb74530d4435333460e4f # v 1.4.1
     needs: [release, publish-container]
     if: needs.release.outputs.release-created == 'true'
     with:
