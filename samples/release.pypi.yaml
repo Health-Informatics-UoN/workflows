@@ -19,7 +19,7 @@ jobs:
   release:
     uses: health-informatics-uon/workflows/.github/workflows/semantic-release.yml@1.4.0
     with:
-      node-version: '24'
+      node-version: "24"
     secrets: inherit
 
   # PyPI trusted publishing (OIDC) cannot be used from within a reusable workflow.
@@ -37,10 +37,12 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: "3.x"
 
       - name: Build package
         run: |

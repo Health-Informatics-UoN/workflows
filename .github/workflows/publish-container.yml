@@ -5,38 +5,38 @@ on:
   workflow_call:
     inputs:
       image-name:
-        description: 'Container image name (e.g. my-app)'
+        description: "Container image name (e.g. my-app)"
         required: true
         type: string
       image-description:
-        description: 'Description used in OCI annotations'
+        description: "Description used in OCI annotations"
         required: false
-        default: ''
+        default: ""
         type: string
       registry:
-        description: 'Container registry host (e.g. ghcr.io)'
+        description: "Container registry host (e.g. ghcr.io)"
         required: false
-        default: 'ghcr.io'
+        default: "ghcr.io"
         type: string
       repo-owner:
-        description: 'Owner/namespace for the image (defaults to calling repo owner)'
+        description: "Owner/namespace for the image (defaults to calling repo owner)"
         required: false
-        default: ''
+        default: ""
         type: string
       context:
-        description: 'Build context passed to Docker (e.g. . or ./app)'
+        description: "Build context passed to Docker (e.g. . or ./app)"
         required: false
-        default: '.'
+        default: "."
         type: string
       dockerfile:
-        description: 'Relative path to Dockerfile'
+        description: "Relative path to Dockerfile"
         required: false
-        default: 'Dockerfile'
+        default: "Dockerfile"
         type: string
       platforms:
-        description: 'Target platforms for the image (comma-separated)'
+        description: "Target platforms for the image (comma-separated)"
         required: false
-        default: 'linux/amd64,linux/arm64'
+        default: "linux/amd64,linux/arm64"
         type: string
 
 env:
@@ -56,6 +56,8 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
