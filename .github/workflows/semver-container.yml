@@ -69,7 +69,7 @@ jobs:
       # before attempting to retag it. Fails fast rather than producing a misleading error
       # from the tag-push step if the publish-container workflow hasn't run yet.
       - name: Check image exists for commit
-        uses: tyriis/docker-image-tag-exists@71a750a41aa78e4efb0842f538140c5df5b8166f # v2.1.0
+        uses: tyriis/docker-image-tag-exists@2cb38c7c5868e9f50e870230718100ad912aac67 # v3.0.0
         with:
           registry: ${{ env.registry }}
           repository: ${{ env.REPO_OWNER_LOWER }}/${{ env.image-name }}
@@ -101,7 +101,7 @@ jobs:
       # Rather than rebuilding the image, we retag the existing edge image (tagged with
       # the commit SHA by publish-container) with the semver tags computed above.
       - name: Push updated image tags
-        uses: akhilerm/tag-push-action@f35ff2cb99d407368b5c727adbcc14a2ed81d509 # v2.2.0
+        uses: akhilerm/tag-push-action@eadeefebd39db8a47e146115649adae1fce576a6 # v2.3.0
         with:
           src: ${{ env.registry }}/${{ env.REPO_OWNER_LOWER }}/${{ env.image-name }}:${{ github.sha }}
           dst: |
