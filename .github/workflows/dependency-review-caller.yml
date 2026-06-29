@@ -3,6 +3,10 @@ name: Dependency Review (self)
 on:
   pull_request:
 
+permissions:
+  contents: read
+  packages: read
+
 jobs:
   dependency-review:
     uses: ./.github/workflows/dependency-review.yml
