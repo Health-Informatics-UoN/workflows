@@ -3,6 +3,9 @@ name: PR Title Check (self)
 on:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   pr-title:
     uses: ./.github/workflows/pr-title.yml
