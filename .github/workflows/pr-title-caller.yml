@@ -5,9 +5,9 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   pr-title:
     uses: ./.github/workflows/pr-title.yml
     secrets: inherit
-
