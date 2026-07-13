@@ -6,14 +6,15 @@ on:
       - main
 
 permissions:
-  contents: read
-  packages: read
+  contents: write
+  issues: write
+  pull-requests: write
 
 jobs:
   release:
     uses: ./.github/workflows/semantic-release.yml
     with:
-      node-version: '20'
+      node-version: "20"
     secrets: inherit
 
   confirm-release:
@@ -22,4 +23,3 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo "A new release was created!"
-
