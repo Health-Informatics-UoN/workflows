@@ -8,6 +8,5 @@ module.exports = {
       '@semantic-release/release-notes-generator',
       '@semantic-release/exec',
       '@semantic-release/github',
-    ],
-    "initialVersion": "1.0.0"
+    ]
 };

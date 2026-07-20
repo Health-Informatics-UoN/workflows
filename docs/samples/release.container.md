@@ -75,6 +75,10 @@ uses: health-informatics-uon/workflows/.github/workflows/semantic-release.yml@v1
 
 Check the [releases](https://github.com/health-informatics-uon/workflows/releases) for available versions.
 
+If you have not made an existing semantic versioning release (even manually), the workflow will default to release 1.0.0.
+
+If you would like a pre-1.0.0 release (for example 0.0.1), you should make a release manually through Github, and then the workflow will continue your numbering. 
+
 ## Languages
 
 ### Python
