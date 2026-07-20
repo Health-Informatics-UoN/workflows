@@ -74,7 +74,7 @@ module.exports = {
       '@semantic-release/release-notes-generator',
       '@semantic-release/exec',
       '@semantic-release/github',
-    ],
+    ]
 };
 ```
 If you have not made an existing semantic versioning release (even manually), the workflow will default to release 1.0.0.
