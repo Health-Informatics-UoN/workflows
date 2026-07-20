@@ -9,5 +9,4 @@ module.exports = {
       '@semantic-release/exec',
       '@semantic-release/github',
     ],
-    "initialVersion": "1.0.0"
 };
