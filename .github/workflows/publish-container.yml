@@ -38,6 +38,11 @@ on:
         required: false
         default: "linux/amd64,linux/arm64"
         type: string
+      build-args:
+        description: "Build-time variables, newline-separated KEY=VALUE pairs (e.g. VERSION=1.2.3)"
+        required: false
+        default: ""
+        type: string
 
 env:
   image-name: ${{ inputs.image-name }}
@@ -47,6 +52,7 @@ env:
   context: ${{ inputs.context }}
   dockerfile: ${{ inputs.dockerfile }}
   platforms: ${{ inputs.platforms }}
+  build-args: ${{ inputs.build-args }}
 
 jobs:
   publish-container:
@@ -105,6 +111,7 @@ jobs:
           file: ${{ env.dockerfile }}
           push: true
           platforms: ${{ env.platforms }}
+          build-args: ${{ env.build-args }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}

@@ -19,6 +19,7 @@ This is intended for releasing dev/edge images, not stable semver releases.
 | `context`          | No       | `'.'`                           | Docker build context.                                |
 | `dockerfile`       | No       | `'Dockerfile'`                  | Path to `Dockerfile` relative to repo root/context.  |
 | `platforms`        | No       | `'linux/amd64,linux/arm64'`     | Target platforms for the image.                      |
+| `build-args`       | No       | `''`                            | Build-time variables, newline-separated `KEY=VALUE` pairs, passed through to `docker/build-push-action` (e.g. `VERSION=1.2.3`). |
 
 ## Secrets
 
@@ -47,8 +48,12 @@ jobs:
       context: .
       dockerfile: Dockerfile
       platforms: linux/amd64,linux/arm64
+      build-args: |
+        VERSION=1.2.3
     secrets: inherit
 ```
+
+`build-args` is optional — omit it if your Dockerfile doesn't declare any `ARG`s you need to pass through.
 
 This will publish images like:
 
