@@ -37,7 +37,7 @@ jobs:
       # so we normalise it here and store it in GITHUB_ENV for all subsequent steps.
       - name: downcase repo-owner
         run: |
-          echo "REPO_OWNER_LOWER=${GITHUB_REPOSITORY_OWNER,,}" >>${GITHUB_ENV}
+          echo "REPO_OWNER_LOWER=${GITHUB_REPOSITORY_OWNER,,}" >> "${GITHUB_ENV}"
 
       - name: Parse version from tag
         id: version
@@ -52,18 +52,22 @@ jobs:
           # the exact patch, following standard container image tagging conventions.
           major=$(echo "$version" | cut -d. -f1)
           minor=$(echo "$version" | cut -d. -f2)
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "major=$major" >> "$GITHUB_OUTPUT"
-          echo "major-minor=$major.$minor" >> "$GITHUB_OUTPUT"
 
           # A hyphen in the version string indicates a pre-release (e.g. 1.0.0-beta.1).
           # Floating major/minor tags must NOT be applied to pre-releases — those tags
           # should always point at the latest stable release, not a pre-release build.
           if [[ "$version" == *-* ]]; then
-            echo "is-prerelease=true" >> "$GITHUB_OUTPUT"
+            is_prerelease=true
           else
-            echo "is-prerelease=false" >> "$GITHUB_OUTPUT"
+            is_prerelease=false
           fi
+
+          {
+            echo "version=$version"
+            echo "major=$major"
+            echo "major-minor=$major.$minor"
+            echo "is-prerelease=$is_prerelease"
+          } >> "$GITHUB_OUTPUT"
 
       # Verify that the edge image built from this commit SHA actually exists in the registry
       # before attempting to retag it. Fails fast rather than producing a misleading error
