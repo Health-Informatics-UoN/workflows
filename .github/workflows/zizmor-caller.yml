@@ -1,0 +1,14 @@
+name: Github Workflows Security Analysis (Zizmor) (self)
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  dependency-review:
+    uses: ./.github/workflows/zizmor.yml
+    secrets: inherit
+
