@@ -10,6 +10,7 @@ permissions:
 jobs:
   dependency-review:
     uses: ./.github/workflows/zizmor.yml
-    security-events: write
+    permissions:
+      security-events: write
     secrets: inherit
 
