@@ -23,7 +23,10 @@ The `semantic-release` step can still be a reusable workflow call, and the `publ
 
 - Your repository must follow [conventional commit](https://conventionalcommits.org/) format
 - We recommend `samples/check.pr-title.yaml` to enforce this on pull requests
-- Your repository settings should only allow squash merges, using the PR title as the commit message so semantic-release can parse it correctly
+- Your repository settings should ONLY allow squash merges, using the PR title as the commit message so semantic-release can parse it correctly
+![GitHub repository settings](../images/squash-merges.png)
+
+
 - You need a `release.config.js` in your repository root — copy from `samples/release.config.js` and update `repositoryUrl`
 - Your package must be configured to derive its version from git tags (see [Python setup](#python-setup) below)
 - You must configure a PyPI trusted publisher for your package (see [PyPI setup](#pypi-trusted-publisher-setup) below)
