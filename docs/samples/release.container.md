@@ -20,7 +20,10 @@ The workflow performs the following steps:
 
 - Your repository must follow [conventional commit](https://conventionalcommits.org/) format
 - We recommend `samples/check.pr-title.yaml` to enforce this on pull requests
-- Your repository settings should only allow squash merges, and use the PR title as the commit message for commit messages to be correctly parsed by semantic-release
+- Your repository settings should ONLY allow squash merges, and use the PR title as the commit message for commit messages to be correctly parsed by semantic-release
+![GitHub repository settings](../images/squash-merges.png)
+
+
 - You need a `samples/release.config.js` in your repository root to configure semantic-release
 - You need a `Dockerfile` in your repository root (or update the `dockerfile` parameter)
 - You need to follow the relevant language steps
