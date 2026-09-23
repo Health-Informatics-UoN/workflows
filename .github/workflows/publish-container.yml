@@ -43,6 +43,17 @@ on:
         required: false
         default: ""
         type: string
+      cache-from:
+        description: ""
+        required: false
+        default: "type=gha"
+        type: string
+      cache-to:
+        description: ""
+        required: false
+        default: "type=gha,mode=max"
+        type: string
+
 
 env:
   image-name: ${{ inputs.image-name }}
@@ -53,6 +64,8 @@ env:
   dockerfile: ${{ inputs.dockerfile }}
   platforms: ${{ inputs.platforms }}
   build-args: ${{ inputs.build-args }}
+  cache-from: ${{ inputs.cache-from }}
+  cache-to: ${{ inputs.cache-to }}
 
 jobs:
   publish-container:
@@ -115,3 +128,5 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
+          cache-from: ${{ env.cache-from }}
+          cache-to: ${{ env.cache-to }}
