@@ -44,12 +44,12 @@ on:
         default: ""
         type: string
       cache-from:
-        description: ""
+        description: "Arguments to pass to cache-from in the docker build push action"
         required: false
         default: "type=gha"
         type: string
       cache-to:
-        description: ""
+        description: "Arguments to pass to cache-to in the docker build push action"
         required: false
         default: "type=gha,mode=max"
         type: string
