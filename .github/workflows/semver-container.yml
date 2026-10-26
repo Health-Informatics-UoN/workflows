@@ -73,7 +73,7 @@ jobs:
       # before attempting to retag it. Fails fast rather than producing a misleading error
       # from the tag-push step if the publish-container workflow hasn't run yet.
       - name: Check image exists for commit
-        uses: tyriis/docker-image-tag-exists@e73c8fdfab85076cdcf2ce4b443181fae2153675 # v2026.6.0
+        uses: tyriis/docker-image-tag-exists@8ebd942f1c3f62af3f19c26a5a1b65e5e9dc674b # v2026.6.0
         with:
           registry: ${{ env.registry }}
           repository: ${{ env.REPO_OWNER_LOWER }}/${{ env.image-name }}
