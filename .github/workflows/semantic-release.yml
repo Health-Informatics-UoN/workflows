@@ -53,7 +53,8 @@ jobs:
             @semantic-release/exec \
             @semantic-release/release-notes-generator \
             @semantic-release/changelog \
-            @semantic-release/github
+            @semantic-release/github \
+            conventional-changelog-conventionalcommits
 
       # Snapshot the current tags before running semantic-release so we can diff
       # afterwards to find exactly which tag (if any) was newly created.
