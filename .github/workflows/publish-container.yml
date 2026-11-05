@@ -1,4 +1,8 @@
-# Publishes an 'edge' container image to a registry, tagging with the current date and commit hash.
+# Builds a container image and publishes it to a registry.
+# On the default branch it is tagged 'edge', the current date and commit hash.
+# On pull requests it is tagged 'pr-<number>' and the PR's commit hash, and never 'edge'.
+# Pull requests from forks and Dependabot only check the image builds, as they can't push.
+# Set `push: false` to only check the image builds for every run.
 name: Publish Container Image
 
 on:
@@ -53,6 +57,11 @@ on:
         required: false
         default: "type=gha,mode=max"
         type: string
+      push:
+        description: "Push the image to the registry. Set to false to only check the image builds. Pull requests from forks and Dependabot never push"
+        required: false
+        default: true
+        type: boolean
 
 
 env:
@@ -66,6 +75,9 @@ env:
   build-args: ${{ inputs.build-args }}
   cache-from: ${{ inputs.cache-from }}
   cache-to: ${{ inputs.cache-to }}
+  # Pull requests from forks and Dependabot get a read-only token, so they can only build.
+  # Everything else pushes, unless the caller opts out with `push: false`.
+  push: ${{ inputs.push && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
 
 jobs:
   publish-container:
@@ -85,6 +97,7 @@ jobs:
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Docker Login
+        if: env.push == 'true'
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ${{ env.registry }}
@@ -96,17 +109,24 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         env:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+          # On pull requests, use the PR head commit for `type=sha` rather than the temporary merge commit
+          DOCKER_METADATA_PR_HEAD_SHA: true
         with:
           images: ${{ env.registry }}/${{ env.repo-owner }}/${{ env.image-name }}
           # Tag notes:
           # - RFC3339 is not suitable for docker tags, so we squash the date
           # - We tag both the short (7-char prefixed) and full sha commit hashes; both are useful
-          # - `edge` represents latest main branch commit (potentially unstable)
+          # - `edge` represents latest main branch commit (potentially unstable), so it is only
+          #   applied on the default branch
+          # - Pull request builds are tagged `pr-<number>` (latest build of the PR) and
+          #   `sha-<PR head commit>` only; the full sha and timestamp tags are kept for
+          #   non-PR builds, as semver-container looks up images by the full commit sha
           tags: |
             type=sha
-            ${{ github.sha }}
-            type=raw,value={{date 'YYYYMMDDHHmmss[Z]'}}
-            edge
+            type=ref,event=pr
+            type=raw,value=${{ github.sha }},enable=${{ github.event_name != 'pull_request' }}
+            type=raw,value={{date 'YYYYMMDDHHmmss[Z]'}},enable=${{ github.event_name != 'pull_request' }}
+            type=raw,value=edge,enable={{is_default_branch}}
           # Label notes:
           # - Static labels are applied in the Dockerfile
           # - Date format in `org.opencontainers.image.created` must be RFC3339
@@ -122,7 +142,7 @@ jobs:
         with:
           context: ${{ env.context }}
           file: ${{ env.dockerfile }}
-          push: true
+          push: ${{ env.push == 'true' }}
           platforms: ${{ env.platforms }}
           build-args: ${{ env.build-args }}
           tags: ${{ steps.meta.outputs.tags }}
