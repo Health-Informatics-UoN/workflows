@@ -85,6 +85,12 @@ jobs:
     permissions:
       packages: write
     steps:
+      - name: Refuse pull_request_target
+        if: github.event_name == 'pull_request_target'
+        run: |
+          echo "::error::publish-container must not be called from pull_request_target; use pull_request instead"
+          exit 1
+
       - name: Check out the repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

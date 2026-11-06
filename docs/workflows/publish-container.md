@@ -105,3 +105,5 @@ This will publish images like:
 - `ghcr.io/<owner>/my-service:sha-abc1234`
 
 To check pull requests build without publishing any images, add `push: false`.
+
+Use the `pull_request` trigger, not `pull_request_target`. `pull_request_target` runs with a write token even for pull requests from forks, and builds the base branch rather than the pull request, so the workflow fails straight away if it is called from it.
