@@ -29,7 +29,7 @@ This is intended for releasing dev/edge images and pull request test images, not
 | `dockerfile`       | No       | `'Dockerfile'`                  | Path to `Dockerfile` relative to repo root/context.  |
 | `platforms`        | No       | `'linux/amd64,linux/arm64'`     | Target platforms for the image.                      |
 | `build-args`       | No       | `''`                            | Build-time variables, newline-separated `KEY=VALUE` pairs, passed through to `docker/build-push-action` (e.g. `VERSION=1.2.3`). |
-| `push`             | No       | `true`                          | Push the image. Set `false` to only check it builds. Pull requests from forks and Dependabot never push, whatever this is set to. |
+| `publish-pr-images` | No     | `false`                         | Publish images for pull requests from branches in your repo. Off by default, so pull requests only check the image builds. Forks and Dependabot never push. |
 
 ## Secrets
 
@@ -73,7 +73,7 @@ This will publish images like:
 
 ## Pull request builds
 
-To build every pull request, add a workflow that runs on `pull_request`. Pull requests from branches in your repo publish their image. Pull requests from forks and Dependabot get a read-only token, so for those the workflow detects this and only checks the image builds — you don't need to configure anything:
+To build every pull request, add a workflow that runs on `pull_request`. By default this only checks the image builds. To also publish images for pull requests from branches in your repo, set `publish-pr-images: true`. Pull requests from forks and Dependabot get a read-only token, so for those the workflow only checks the image builds, whatever is set:
 
 ```yaml
 name: Check Container Builds
@@ -96,14 +96,15 @@ jobs:
     with:
       image-name: my-service
       image-description: 'My service pull request build'
+      publish-pr-images: true
     secrets: inherit
 ```
 
-This will publish images like:
+With `publish-pr-images: true`, this will publish images like:
 
 - `ghcr.io/<owner>/my-service:pr-123`
 - `ghcr.io/<owner>/my-service:sha-abc1234`
 
-To check pull requests build without publishing any images, add `push: false`.
+Without `publish-pr-images: true`, pull requests only check the image builds and nothing is published. In that case `packages: write` isn't needed.
 
 Use the `pull_request` trigger, not `pull_request_target`. `pull_request_target` runs with a write token even for pull requests from forks, and builds the base branch rather than the pull request, so the workflow fails straight away if it is called from it.

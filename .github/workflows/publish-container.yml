@@ -1,8 +1,8 @@
 # Builds a container image and publishes it to a registry.
 # On the default branch it is tagged 'edge', the current date and commit hash.
 # On pull requests it is tagged 'pr-<number>' and the PR's commit hash, and never 'edge'.
-# Pull requests from forks and Dependabot only check the image builds, as they can't push.
-# Set `push: false` to only check the image builds for every run.
+# Pull requests only check the image builds, unless the caller sets `publish-pr-images: true`.
+# Pull requests from forks and Dependabot never push, as they can't.
 name: Publish Container Image
 
 on:
@@ -57,10 +57,10 @@ on:
         required: false
         default: "type=gha,mode=max"
         type: string
-      push:
-        description: "Push the image to the registry. Set to false to only check the image builds. Pull requests from forks and Dependabot never push"
+      publish-pr-images:
+        description: "Publish images for pull requests from branches in this repo. Off by default, so pull requests only check the image builds. Forks and Dependabot never push"
         required: false
-        default: true
+        default: false
         type: boolean
 
 
@@ -75,9 +75,10 @@ env:
   build-args: ${{ inputs.build-args }}
   cache-from: ${{ inputs.cache-from }}
   cache-to: ${{ inputs.cache-to }}
-  # Pull requests from forks and Dependabot get a read-only token, so they can only build.
-  # Everything else pushes, unless the caller opts out with `push: false`.
-  push: ${{ inputs.push && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
+  # Pull requests only push when the caller opts in with `publish-pr-images: true`, and never
+  # from forks or Dependabot, which get a read-only token so can only build.
+  # Everything else (e.g. a push to the default branch) always pushes.
+  push: ${{ github.event_name != 'pull_request' || (inputs.publish-pr-images && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
 
 jobs:
   publish-container:
