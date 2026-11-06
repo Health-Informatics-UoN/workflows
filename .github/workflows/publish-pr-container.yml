@@ -1,0 +1,161 @@
+# Builds a container image for a pull request and publishes it to a registry, so the pull request
+# can be tested before it is merged.
+#
+# Designed to be called from a `pull_request` trigger only.
+# The image is tagged:
+#   - `pr-<number>`      the latest build of the pull request
+#   - `sha-<commit>`     the pull request's own commit (not the merge commit GitHub builds)
+#   - `tree-<hash>`      the git tree hash of what was built, so a later workflow can find
+#                        the image built from identical code (see issue #71)
+# It never tags `edge`, `latest`, semver or the full commit SHA, so it can't be released by
+# `semver-container`.
+#
+# Pull requests from forks and Dependabot get a read-only token, so for those it only checks
+# the image builds. Set `publish: false` to only check the image builds for every pull request.
+name: Publish Pull Request Container Image
+
+on:
+  workflow_call:
+    inputs:
+      image-name:
+        description: "Container image name (e.g. my-app)"
+        required: true
+        type: string
+      image-description:
+        description: "Description used in OCI annotations"
+        required: false
+        default: ""
+        type: string
+      registry:
+        description: "Container registry host (e.g. ghcr.io)"
+        required: false
+        default: "ghcr.io"
+        type: string
+      repo-owner:
+        description: "Owner/namespace for the image (defaults to calling repo owner)"
+        required: false
+        default: ""
+        type: string
+      context:
+        description: "Build context passed to Docker (e.g. . or ./app)"
+        required: false
+        default: "."
+        type: string
+      dockerfile:
+        description: "Relative path to Dockerfile"
+        required: false
+        default: "Dockerfile"
+        type: string
+      platforms:
+        description: "Target platforms for the image (comma-separated)."
+        required: false
+        default: "linux/amd64,linux/arm64"
+        type: string
+      build-args:
+        description: "Build-time variables, newline-separated KEY=VALUE pairs (e.g. VERSION=1.2.3)"
+        required: false
+        default: ""
+        type: string
+      cache-from:
+        description: "Arguments to pass to cache-from in the docker build push action"
+        required: false
+        default: "type=gha"
+        type: string
+      cache-to:
+        description: "Arguments to pass to cache-to in the docker build push action"
+        required: false
+        default: "type=gha,mode=max"
+        type: string
+      publish:
+        description: "Publish the image. Set to false to only check the image builds. Pull requests from forks and Dependabot never publish"
+        required: false
+        default: true
+        type: boolean
+
+env:
+  image-name: ${{ inputs.image-name }}
+  image-description: ${{ inputs.image-description }}
+  repo-owner: ${{ inputs.repo-owner || github.repository_owner }}
+  registry: ${{ inputs.registry }}
+  context: ${{ inputs.context }}
+  dockerfile: ${{ inputs.dockerfile }}
+  platforms: ${{ inputs.platforms }}
+  build-args: ${{ inputs.build-args }}
+  cache-from: ${{ inputs.cache-from }}
+  cache-to: ${{ inputs.cache-to }}
+  # Pull requests from forks and Dependabot get a read-only token, so they can only build.
+  publish: ${{ inputs.publish && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
+
+jobs:
+  publish-pr-container:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      # This workflow relies on pull_request behaviour: a read-only token for forks, and building
+      # the pull request's code. pull_request_target gives forks a write token and builds the base
+      # branch instead, so refuse it and anything else.
+      - name: Require pull_request trigger
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "::error::publish-pr-container must be called from a pull_request trigger, not ${GITHUB_EVENT_NAME}"
+          exit 1
+
+      - name: Check out the repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The tree hash identifies the exact files built, whatever commit they end up in.
+      # A squash merge creates a new commit SHA, but the same tree when main hasn't moved on.
+      - name: Get tree hash
+        id: tree
+        run: echo "hash=$(git rev-parse 'HEAD^{tree}')" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Docker Login
+        if: env.publish == 'true'
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ${{ env.registry }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker Metadata action
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+          # Use the pull request's own commit for `type=sha` and `{{sha}}`, not the merge commit
+          DOCKER_METADATA_PR_HEAD_SHA: true
+        with:
+          images: ${{ env.registry }}/${{ env.repo-owner }}/${{ env.image-name }}
+          tags: |
+            type=ref,event=pr
+            type=sha
+            type=raw,value=tree-${{ steps.tree.outputs.hash }}
+          labels: |
+            org.opencontainers.image.revision={{sha}}
+            org.opencontainers.image.created={{date 'YYYY-MM-DD HH:mm:ss[Z]'}}
+          annotations: |
+            org.opencontainers.image.description=${{ env.image-description }}
+
+      - name: Build and push Docker images
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ env.context }}
+          file: ${{ env.dockerfile }}
+          push: ${{ env.publish == 'true' }}
+          platforms: ${{ env.platforms }}
+          build-args: ${{ env.build-args }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          cache-from: ${{ env.cache-from }}
+          cache-to: ${{ env.cache-to }}
