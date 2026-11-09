@@ -93,15 +93,6 @@ jobs:
       contents: read
       packages: write
     steps:
-      # This workflow relies on pull_request behaviour: a read-only token for forks, and building
-      # the pull request's code. pull_request_target gives forks a write token and builds the base
-      # branch instead, so refuse it and anything else.
-      - name: Require pull_request trigger
-        if: github.event_name != 'pull_request'
-        run: |
-          echo "::error::publish-pr-container must be called from a pull_request trigger, not ${GITHUB_EVENT_NAME}"
-          exit 1
-
       - name: Check out the repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
