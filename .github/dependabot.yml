@@ -15,5 +15,11 @@ updates:
           - "minor"
           - "patch"
           - "major"
+    ignore:
+      # A stray v2026.6.0 tag (never a release) pointed at a commit older than v3.0.0, and
+      # Dependabot treated it as newer, downgrading us in #44.
+      # See https://github.com/tyriis/docker-image-tag-exists/issues/176
+      - dependency-name: "tyriis/docker-image-tag-exists"
+        versions: [">= 2026"]
 
 
