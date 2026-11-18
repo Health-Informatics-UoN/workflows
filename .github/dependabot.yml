@@ -22,4 +22,15 @@ updates:
       - dependency-name: "tyriis/docker-image-tag-exists"
         versions: [">= 2026"]
 
-
+  # Claude Code CLI used by the Claude review action (package-lock.json)
+  - package-ecosystem: "npm"
+    directory: "/.github/actions/claude-review"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    # Wait a week before proposing a new release, so a compromised release
+    # that gets pulled quickly never reaches this repo.
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "fix(dependencies): "

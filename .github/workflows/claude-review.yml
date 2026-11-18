@@ -1,0 +1,54 @@
+# Reusable Claude PR review. Call it from a pull_request workflow (see
+# check.claude-review.yml) and pass ANTHROPIC_API_KEY explicitly.
+name: Claude PR Review
+
+on:
+  workflow_call:
+    inputs:
+      # Defaults match the action's own defaults.
+      model:
+        description: Claude model to use.
+        type: string
+        default: claude-sonnet-5-5
+      max-lines:
+        description: Skip PRs with more changed lines (additions + deletions) than this.
+        type: number
+        default: 1000
+    secrets:
+      ANTHROPIC_API_KEY:
+        description: Claude Console API key.
+        required: true
+
+jobs:
+  review:
+    # Skip drafts, forks (no secrets) and Dependabot (no secrets)
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !github.event.pull_request.draft &&
+      github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write # Allows posting review comments; contents: read blocks pushes
+    # Cancel older in-progress runs if new commits are pushed to the same PR
+    concurrency:
+      group: claude-review-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout PR code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          # Don't leave the GitHub token in .git/config, where Claude could read it.
+          persist-credentials: false
+
+      # $/ resolves to this workflow's own repository at the commit that is running,
+      # so the action always matches the version of this workflow the caller pinned.
+      - name: Claude review
+        uses: $/.github/actions/claude-review
+        with:
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: ${{ inputs.model }}
+          max-lines: ${{ inputs.max-lines }}

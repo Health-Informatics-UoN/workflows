@@ -1,0 +1,82 @@
+name: Claude PR review
+description: >-
+  Reviews a pull request with Claude Code, read-only, and posts the findings as
+  inline comments plus a summary comment. Run it on pull_request events, after
+  checking out the PR.
+
+inputs:
+  anthropic-api-key:
+    description: >-
+      Claude Console API key. The API credits included with Claude Team and Max
+      plans cover this (`claude -p` run with an API key is billed as Agent SDK
+      usage); they don't cover anthropics/claude-code-action, which is why this
+      action runs the CLI directly. https://support.claude.com/en/articles/17154008
+    required: true
+  github-token:
+    description: Token used to read the PR and post comments. Needs pull-requests write.
+    default: ${{ github.token }}
+  model:
+    description: Claude model to use.
+    default: claude-sonnet-5-5
+  max-turns:
+    description: Maximum number of Claude turns per review; limits cost.
+    default: "15"
+  max-lines:
+    description: Skip PRs with more changed lines (additions + deletions) than this.
+    default: "1000"
+
+runs:
+  using: composite
+  steps:
+    - name: Check PR size
+      id: size
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        PR_URL: ${{ github.event.pull_request.html_url }}
+        ADDITIONS: ${{ github.event.pull_request.additions }}
+        DELETIONS: ${{ github.event.pull_request.deletions }}
+        MAX_LINES: ${{ inputs.max-lines }}
+      run: bash "$GITHUB_ACTION_PATH/check-size.sh"
+
+    # Fetched here so the Claude step has no GitHub token and no shell. Comments
+    # aren't fetched: anyone can post them, so they could carry injected instructions.
+    - name: Fetch PR
+      if: steps.size.outputs.too-large == 'false'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+      run: |
+        rm -rf .pr-review
+        mkdir .pr-review
+        gh pr view "$PR_NUMBER" --repo "$REPO" \
+          --json title,body,author,baseRefName,headRefName,files > .pr-review/pr.json
+        gh pr diff "$PR_NUMBER" --repo "$REPO" > .pr-review/pr.diff
+
+    # Installs the Claude Code version pinned in package-lock.json, checking every
+    # package against its recorded checksum. Dependabot proposes updates.
+    - name: Install Claude Code
+      if: steps.size.outputs.too-large == 'false'
+      shell: bash
+      run: npm ci --prefix "$GITHUB_ACTION_PATH" --no-audit --no-fund
+
+    - name: Run Claude review
+      if: steps.size.outputs.too-large == 'false'
+      shell: bash
+      env:
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        MODEL: ${{ inputs.model }}
+        MAX_TURNS: ${{ inputs.max-turns }}
+      run: bash "$GITHUB_ACTION_PATH/review.sh"
+
+    - name: Post review comments
+      if: steps.size.outputs.too-large == 'false'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      run: bash "$GITHUB_ACTION_PATH/post.sh"
