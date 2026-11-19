@@ -71,8 +71,12 @@ has_arg_pair() {
 @test "reading is allowed only inside the checkout, with secret locations denied" {
   run bash "$ACTION_DIR/scripts/review.sh"
   has_arg_pair --allowedTools "Read(./**),Grep(./**),Glob(./**)"
-  for path in "//proc/**" "//sys/**" "//etc/**" "//root/**" "//tmp/**" "//run/**" "//var/**" "~/.*/**"; do
-    grep -A1 -x -- "--disallowedTools" "$CLAUDE_ARGS" | grep -qF "Read($path)"
+  denied=$(grep -A1 -x -- "--disallowedTools" "$CLAUDE_ARGS" | tail -n 1)
+  for tool in Read Grep Glob; do
+    for path in "//proc/**" "//sys/**" "//etc/**" "//root/**" "//tmp/**" "//run/**" \
+      "//var/**" "~/.*/**" "/$RUNNER_TEMP/**"; do
+      [[ ",$denied," == *",$tool($path),"* ]]
+    done
   done
 }
 

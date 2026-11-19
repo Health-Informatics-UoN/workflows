@@ -92,6 +92,9 @@ jobs:
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           LABEL: ${{ inputs.label }}
+        # The REST endpoint accepts pull-requests: write. jq encodes the label name for
+        # the URL, for example a space as %20.
         run: |
-          gh pr edit "$PR_NUMBER" --repo "$REPO" --remove-label "$LABEL" \
+          label_path=$(jq -rn --arg label "$LABEL" '$label | @uri')
+          gh api -X DELETE "repos/${REPO}/issues/${PR_NUMBER}/labels/${label_path}" > /dev/null \
             || echo "::warning::Could not remove the $LABEL label"

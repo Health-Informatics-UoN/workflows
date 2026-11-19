@@ -46,11 +46,23 @@ $(cat "$GITHUB_ACTION_PATH/prompt/standards.md")"
 # --allowedTools: Read, Grep and Glob are permitted only in the checkout ("./**").
 #   In print mode (-p), Claude Code refuses all items that are not permitted. This
 #   includes symlinks that point outside the checkout.
-# --disallowedTools: a second barrier. It prevents reads of the locations that contain
-#   secrets, for example /proc/self/environ, which contains the API key. "//" is an
-#   absolute path and "~" is the home folder.
+# --disallowedTools: a second barrier. It denies Read, Grep and Glob on the locations
+#   that contain secrets, for example /proc/self/environ, which contains the API key.
+#   It also denies $RUNNER_TEMP, which is outside the checkout. It contains
+#   threads.json, with comments from any person, which Claude must not read.
+#   "//" is an absolute path and "~" is the home folder.
 allow="Read(./**),Grep(./**),Glob(./**)"
-deny="Read(//proc/**),Read(//sys/**),Read(//etc/**),Read(//root/**),Read(//tmp/**),Read(//run/**),Read(//var/**),Read(~/.*/**)"
+# The "~" is for Claude Code, not for the shell, so the shell must not expand it.
+# shellcheck disable=SC2088
+denied_paths=("//proc/**" "//sys/**" "//etc/**" "//root/**" "//tmp/**" "//run/**" \
+  "//var/**" "~/.*/**" "/${RUNNER_TEMP}/**")
+deny=""
+for tool in Read Grep Glob; do
+  for denied_path in "${denied_paths[@]}"; do
+    deny+="${tool}(${denied_path}),"
+  done
+done
+deny=${deny%,}  # Remove the last comma.
 
 # --json-schema: Claude Code returns the answer as structured_output.
 # "|| true": a failed run also prints JSON that contains the error. The checks below
