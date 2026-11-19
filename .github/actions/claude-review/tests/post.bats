@@ -210,6 +210,21 @@ posted_summary() {
   [ "$(count_calls --body-file)" -eq 1 ]
 }
 
+@test "a diff too large to pass as one command-line argument still works" {
+  # 20000 added lines make a line map of more than 128 KiB, the Linux limit for one
+  # command-line argument.
+  {
+    printf 'diff --git a/big.txt b/big.txt\nnew file mode 100644\n--- /dev/null\n+++ b/big.txt\n'
+    printf '@@ -0,0 +1,20000 @@\n'
+    seq 1 20000 | sed 's/^/+line /'
+  } > .pr-review/pr.diff
+  write_review '[{"path":"big.txt","line":19999,"body":"Near the end"}]'
+  run bash "$ACTION_DIR/scripts/post.sh"
+  [ "$status" -eq 0 ]
+  [ "$(stat -c %s "$RUNNER_TEMP/commentable.json")" -gt 131072 ]
+  [ "$(posted_review | jq -c '.comments[0] | {path, line}')" = '{"path":"big.txt","line":19999}' ]
+}
+
 @test "a file name with a space can be commented on" {
   write_review '[{"path":"my notes.txt","line":1,"body":"Spaces"}]'
   run bash "$ACTION_DIR/scripts/post.sh"

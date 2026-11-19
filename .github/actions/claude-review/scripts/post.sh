@@ -19,6 +19,7 @@ set -euo pipefail
 
 out="$RUNNER_TEMP/review.json"
 threads_file="$RUNNER_TEMP/threads.json"
+commentable_file="$RUNNER_TEMP/commentable.json"
 diff=".pr-review/pr.diff"
 
 # Hidden markers identify the comments of this action on later runs. They are HTML
@@ -59,8 +60,10 @@ superseded_marker="<!-- claude-review-superseded -->"
 # LC_ALL=C makes awk use bytes, so the codes become the correct bytes in all awk types.
 #
 # Then jq changes these lines into one JSON object: {"path": {"line": hunk number}},
-# for example {"app.py": {"1": "1", "2": "1", "21": "2"}}.
-commentable=$(LC_ALL=C awk '
+# for example {"app.py": {"1": "1", "2": "1", "21": "2"}}. The object goes into a file,
+# not a shell variable: the next jq reads it with --slurpfile. A large diff makes a
+# large object, and Linux limits one command-line argument to 128 KiB.
+LC_ALL=C awk '
   # This function changes a quoted name from the diff back into the real name. It
   # removes the quotes and changes each backslash code into its character: \NNN (an
   # octal byte value), \t (TAB), \n (new line). A backslash followed by a different
@@ -111,7 +114,8 @@ commentable=$(LC_ALL=C awk '
   # Context lines (space) and added lines (+) are in the new file. Removed lines (-)
   # are not, so the program does not count them.
   in_hunk && file != "" && /^[ +]/ { print file "\t" line "\t" hunk; line++ }
-' "$diff" | jq -Rn 'reduce (inputs | split("\t")) as [$path, $line, $hunk] ({}; .[$path][$line] = $hunk)')
+' "$diff" | jq -Rn 'reduce (inputs | split("\t")) as [$path, $line, $hunk] ({}; .[$path][$line] = $hunk)' \
+  > "$commentable_file"
 
 # --- Sort the findings ----------------------------------------------------------------
 #
@@ -122,9 +126,10 @@ commentable=$(LC_ALL=C awk '
 # the correct order and in one hunk. If not, the script removes the start_line and puts
 # the comment on the last line only.
 # "side": "RIGHT" means the new version of the file, not the old version.
-split=$(jq --argjson commentable "$commentable" --arg marker "$finding_marker" '
+split=$(jq --slurpfile commentable "$commentable_file" --arg marker "$finding_marker" '
   # The hunk that contains a line, or null if the line is not in the diff.
-  def hunk_of($path; $line): $commentable[$path][($line | tostring)];
+  # --slurpfile gives the file contents as a list, so the object is $commentable[0].
+  def hunk_of($path; $line): $commentable[0][$path][($line | tostring)];
 
   .structured_output.findings
   | map(. as $finding | hunk_of($finding.path; $finding.line) as $hunk
