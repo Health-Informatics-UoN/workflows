@@ -146,7 +146,7 @@ split=$(jq --argjson ok "$commentable" --arg marker "$finding_marker" '
 # and that do not have the superseded mark. The bot check is important, because anyone
 # can copy the marker into their own comment.
 threads=$(jq -r --arg finding "$finding_marker" --arg superseded "$superseded_marker" '
-  .data.repository.pullRequest.reviewThreads.nodes[]
+  .[]
   | select(.isResolved | not)
   | select(.comments.totalCount == 1)
   | select(.comments.nodes[0].author.__typename == "Bot")

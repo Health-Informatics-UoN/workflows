@@ -5,10 +5,10 @@
 # again after a person disagrees with it.
 #
 # Writes two files:
-#   $RUNNER_TEMP/threads.json  the full answer from GitHub. post.sh uses it for the
-#                              earlier findings. It is outside the checkout on purpose:
-#                              it contains comments from any person. Claude must not
-#                              read these comments.
+#   $RUNNER_TEMP/threads.json  all the review threads of the PR, as one JSON list.
+#                              post.sh uses it for the earlier findings. It is outside
+#                              the checkout on purpose: it contains comments from any
+#                              person. Claude must not read these comments.
 #   .pr-review/discussed.json  the filtered list below, in the checkout for Claude.
 #
 # This file includes only replies from persons with access to the repository (owners,
@@ -39,17 +39,23 @@ marker="<!-- claude-review-finding -->"
 # post.sh uses the thread id and isResolved to resolve or mark old findings, and the
 # comment databaseId to edit them. "line" is null if the code changed after the
 # comment (the thread is outdated). Then "originalLine" is the line of the first post.
-# The first 100 threads are sufficient for almost all PRs.
+# GitHub gives a maximum of 100 threads on each page. With --paginate, gh gets all the
+# pages: it gives $endCursor (the position after the last page) to the next request,
+# until hasNextPage is false. gh prints one JSON answer for each page. jq -s reads all
+# the answers and joins their threads into one list.
+# The query gets a maximum of 20 comments for each thread. totalCount is always the
+# full number, so the check for "no replies" in post.sh is always correct.
 # REPO is "owner/name": ${REPO%/*} is the owner and ${REPO#*/} is the name.
 # The $ names in the query are GraphQL variables, not shell variables. Thus, the
 # single quotes are on purpose.
 # shellcheck disable=SC2016
-gh api graphql \
+gh api graphql --paginate \
   -f owner="${REPO%/*}" -f name="${REPO#*/}" -F number="$PR_NUMBER" -f query='
-    query($owner: String!, $name: String!, $number: Int!) {
+    query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
       repository(owner: $owner, name: $name) {
         pullRequest(number: $number) {
-          reviewThreads(first: 100) {
+          reviewThreads(first: 100, after: $endCursor) {
+            pageInfo { hasNextPage endCursor }
             nodes {
               id isResolved path line originalLine
               comments(first: 20) {
@@ -60,12 +66,12 @@ gh api graphql \
           }
         }
       }
-    }' > "$threads"
+    }' \
+  | jq -s '[.[].data.repository.pullRequest.reviewThreads.nodes[]]' > "$threads"
 
 jq --arg marker "$marker" '
-  .data.repository.pullRequest.reviewThreads.nodes
   # Keep only the threads that a bot account started with the marker.
-  | map(select(.comments.nodes[0].body | contains($marker))
+  map(select(.comments.nodes[0].body | contains($marker))
       | select(.comments.nodes[0].author.__typename == "Bot")
       | {
           path,

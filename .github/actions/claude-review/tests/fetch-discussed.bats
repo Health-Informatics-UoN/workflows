@@ -68,14 +68,31 @@ finding=$'Use a constant here.\n\n<!-- claude-review-finding -->'
   [ "$(jq '.[0].line' .pr-review/discussed.json)" -eq 9 ]
 }
 
-@test "GitHub's full answer is saved outside the checkout, for post.sh" {
+@test "all the threads are saved as one list outside the checkout, for post.sh" {
   set_threads "$(thread "$finding")"
-  expected=$GH_THREADS_JSON
+  expected=$(jq -c '[.data.repository.pullRequest.reviewThreads.nodes[]]' <<< "$GH_THREADS_JSON")
   rm "$RUNNER_TEMP/threads.json"
   run bash "$ACTION_DIR/scripts/fetch-discussed.sh"
   [ "$status" -eq 0 ]
-  [ "$(jq -c . "$RUNNER_TEMP/threads.json")" = "$(jq -c . <<< "$expected")" ]
+  [ "$(jq -c . "$RUNNER_TEMP/threads.json")" = "$expected" ]
   [ ! -e .pr-review/threads.json ]
+}
+
+@test "all the pages of threads are fetched, not only the first 100" {
+  run bash "$ACTION_DIR/scripts/fetch-discussed.sh"
+  grep -qx -- "--paginate" "$(calls_with reviewThreads)"
+  grep -qF 'after: $endCursor' "$(calls_with reviewThreads)"
+  grep -qF 'pageInfo { hasNextPage endCursor }' "$(calls_with reviewThreads)"
+}
+
+@test "threads from every page are saved and used" {
+  set_threads "$(thread "$finding" "[$(reply alice MEMBER 'First page')]" true Bot T_page1)"
+  GH_THREADS_JSON_PAGE2=$(threads_page "$(thread "$finding" "[$(reply bob MEMBER 'Second page')]" true Bot T_page2)")
+  export GH_THREADS_JSON_PAGE2
+  run bash "$ACTION_DIR/scripts/fetch-discussed.sh"
+  [ "$status" -eq 0 ]
+  [ "$(jq -c '[.[].id]' "$RUNNER_TEMP/threads.json")" = '["T_page1","T_page2"]' ]
+  [ "$(jq -c '[.[].replies[0].body]' .pr-review/discussed.json)" = '["First page","Second page"]' ]
 }
 
 @test "no threads gives an empty list" {

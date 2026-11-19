@@ -23,7 +23,7 @@ respond() {
   if [ -n "$filter" ]; then jq -r "$filter" <<< "$1"; else printf '%s\n' "$1"; fi
 }
 
-no_threads='{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}'
+no_threads='{"data":{"repository":{"pullRequest":{"reviewThreads":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}}}}}'
 no_comments='{"comments":[]}'
 
 case " $* " in
@@ -31,7 +31,10 @@ case " $* " in
     [ -z "${GH_FAIL_RESOLVE:-}" ] || exit 1
     respond '{}' ;;
   *reviewThreads*)
-    respond "${GH_THREADS_JSON:-$no_threads}" ;;
+    # gh --paginate prints one answer for each page. GH_THREADS_JSON_PAGE2, if set, is
+    # a second page.
+    respond "${GH_THREADS_JSON:-$no_threads}"
+    [ -z "${GH_THREADS_JSON_PAGE2:-}" ] || respond "$GH_THREADS_JSON_PAGE2" ;;
   *"/reviews "*)
     [ -z "${GH_FAIL_REVIEW:-}" ] || exit 1
     respond '{}' ;;
