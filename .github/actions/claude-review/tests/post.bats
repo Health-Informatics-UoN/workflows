@@ -2,7 +2,8 @@
 # These are the tests for post.sh.
 #
 # fixtures/pr.diff changes these files:
-#   app.py   hunk 1: new lines 1-4 (line 2 is added)
+#   app.py   hunk 1: new lines 1-4 (line 2 is added; line 3 is a blank context line,
+#            which a diff stores as one space)
 #            hunk 2: new lines 21-24 (lines 22 and 23 are added). The hunk has a removed
 #            line that starts with "-- " and an added line that starts with "++ ". In
 #            the diff, these lines show as "--- " and "+++ ", the same as file headers.

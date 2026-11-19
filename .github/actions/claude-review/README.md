@@ -54,9 +54,7 @@ The tests in `tests/review.bats` fail if any of these flags is removed.
 
 ## Disagreeing with a finding
 
-When someone replies to a finding, the next run doesn't resolve that thread: it's now a conversation between people. `fetch-discussed.sh` collects the findings people have replied to, with their replies, into `.pr-review/discussed.json`, and `prompt/prompt.md` tells Claude not to raise them again unless the code has changed in a way the reply doesn't cover.
-
-Only replies from owners, organisation members and collaborators are included, for the same reason comments aren't fetched. And a thread only counts as an earlier finding if a bot account started it, so a person can't post their own "finding" with a copied marker and have it passed to Claude once someone replies.
+Replies to a finding are passed to Claude on the next run, so it does not raise the finding again. See [the workflow docs](../../../docs/workflows/claude-review.md#disagreeing-with-a-finding) for how this works and which replies count. `scripts/fetch-discussed.sh` collects them.
 
 ## Tests
 
@@ -71,46 +69,9 @@ bats .github/actions/claude-review/tests
 
 CI runs them on Ubuntu. macOS's own `awk` may behave slightly differently from Ubuntu's.
 
-### What's in `tests/`
+There is one test file for each script, and `defaults.bats` checks that the workflow and action defaults match. `test_helper.bash` holds the shared setup and helpers. The tests use fake `gh` and `claude` programs in `tests/bin`, so nothing touches GitHub or the Claude API; the header of each fake explains how it works. `tests/post.bats` describes what each part of the sample diff, `tests/fixtures/pr.diff`, tests.
 
-| File | Purpose |
-|---|---|
-| `check-size.bats` | Tests for `check-size.sh`: under, at and over the limit, and commenting only once. |
-| `review.bats` | Tests for `review.sh`: the arguments passed to Claude, including every security flag, and each kind of failure. |
-| `post.bats` | Tests for `post.sh`: which lines comments attach to, ranges, the summary, resolving earlier threads, and what happens when GitHub rejects a call. |
-| `fetch-pr.bats` | Tests for `fetch-pr.sh`: the diff is for the exact commits in the event, and a `.pr-review` folder in the PR is replaced. |
-| `fetch-discussed.bats` | Tests for `fetch-discussed.sh`: which replies are passed to Claude and which are left out, including threads a person started with a copied marker. |
-| `defaults.bats` | Checks that the reusable workflow's input defaults match the action's, and that the limits are 2000 lines and 25 turns. |
-| `test_helper.bash` | Shared setup, helpers for checking what the fake `gh` was asked to do, and helpers that build review threads (`thread`, `reply`, `set_threads`, `as_finding`) for the `post.sh` and `fetch-discussed.sh` tests. |
-| `bin/gh`, `bin/claude` | Fakes that stand in for the real programs (see below). |
-| `fixtures/pr.diff` | A sample PR diff (see below). |
-
-### The fakes in `tests/bin`
-
-The tests run the real scripts, but with fake `gh` and `claude` programs, so nothing touches GitHub or the Claude API.
-
-- **How they're used:** `test_helper.bash` puts `tests/bin` first in `PATH`, so when a script runs `gh`, the shell finds the fake first. `review.sh` runs Claude Code by its full path in the action folder, so `review.bats` links the fake `claude` into that path in a temporary folder.
-- **Fake `gh`:**
-  - records every call: its arguments in `NNN.args` and anything sent on stdin in `NNN.stdin`, so tests can check what would have been posted;
-  - answers with sample GitHub responses that the test sets in environment variables (`GH_THREADS_JSON`, `GH_ISSUE_COMMENTS_JSON`, `GH_PR_JSON`);
-  - applies the script's own `--jq` filter to that sample, as the real `gh` does, so the scripts' filters are tested too;
-  - fails on request (`GH_FAIL_REVIEW`, `GH_FAIL_RESOLVE`), to test what happens when GitHub rejects a call.
-- **Fake `claude`:** records its arguments and prints the output the test sets (`CLAUDE_OUTPUT`, `CLAUDE_EXIT`).
-
-The fakes only behave as written, so they can't show how the real GitHub API behaves. For example, real runs showed the workflow token can't resolve review threads, which no test could have. Real pull requests show that. This repository's own PRs run the review through `claude-review-caller.yml`.
-
-### The sample diff in `tests/fixtures/pr.diff`
-
-`post.bats` copies it to `.pr-review/pr.diff`, where the action saves a real PR's diff. It's small, but each part tests something:
-
-| Part | New lines | Tests |
-|---|---|---|
-| `app.py`, first hunk | 1–4 | Added and context lines can both be commented on. Line 3 is a blank context line, which a diff stores as one space. |
-| `app.py`, second hunk | 21–24 | A range across the two hunks (for example 3–22) is reduced to its last line. Line 10, between the hunks, isn't in the diff. |
-| A removed line shown as `--- …` and an added line shown as `+++ …` | 23 is the added one | Lines that look like file headers are still counted as lines. |
-| `old.txt`, deleted (`+++ /dev/null`) | none | A finding on a deleted file goes to the summary. |
-| `my notes.txt`, new | 1 | Git adds a TAB after a name with a space on the `+++` line; it's removed. |
-| `café.py` | 1 | Git quotes the name and writes the accent as backslash codes (`"b/caf\303\251.py"`); they're turned back into the real name. |
+The fakes only behave as written. Real runs show how the GitHub API behaves: for example, they showed that the workflow token cannot resolve review threads. This repository's own PRs run the review through `claude-review-caller.yml`.
 
 ## Changing the action
 
