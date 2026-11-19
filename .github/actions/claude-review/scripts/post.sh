@@ -154,12 +154,14 @@ while IFS= read -r thread; do
   [ -n "$thread" ] || continue
   id=$(jq -r '.id' <<< "$thread")
 
-  # Skip the thread if it now has a reply or is resolved.
+  # Skip the thread if it now has a reply or is resolved. If the check fails, skip the
+  # thread too: the new findings are more important.
   # shellcheck disable=SC2016
   now=$(gh api graphql -F id="$id" -f query='
     query($id: ID!) { node(id: $id) { ... on PullRequestReviewThread {
       isResolved comments(first: 1) { totalCount } } } }' \
-    --jq '.data.node | "\(.isResolved) \(.comments.totalCount)"')
+    --jq '.data.node | "\(.isResolved) \(.comments.totalCount)"') \
+    || { echo "::warning::Could not check review thread $id"; continue; }
   [ "$now" = "false 1" ] || continue
 
   # shellcheck disable=SC2016

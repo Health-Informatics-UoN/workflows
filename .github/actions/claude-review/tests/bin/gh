@@ -30,6 +30,7 @@ no_pr='{"title":"","body":""}'
 case " $* " in
   *PullRequestReviewThread*)
     # The state of one thread now. GH_THREAD_NOW_JSON, if set, is a different state.
+    [ -z "${GH_FAIL_THREAD_NOW:-}" ] || exit 1
     respond "${GH_THREAD_NOW_JSON:-$thread_now}" ;;
   *resolveReviewThread*)
     [ -z "${GH_FAIL_RESOLVE:-}" ] || exit 1

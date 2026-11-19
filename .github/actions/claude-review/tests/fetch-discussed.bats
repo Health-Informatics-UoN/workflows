@@ -104,6 +104,13 @@ finding=$'Use a constant here.\n\n<!-- claude-review-finding -->'
   [ "$(jq -c '[.[].replies[0].body]' .pr-review/discussed.json)" = '["First page","Second page"]' ]
 }
 
+@test "a thread with no comments does not stop the script" {
+  set_threads "$(thread "$finding" | jq '.comments = {totalCount: 0, nodes: []}')"
+  run bash "$ACTION_DIR/scripts/fetch-discussed.sh"
+  [ "$status" -eq 0 ]
+  [ "$(jq 'length' .pr-review/discussed.json)" -eq 0 ]
+}
+
 @test "no threads gives an empty list" {
   run bash "$ACTION_DIR/scripts/fetch-discussed.sh"
   [ "$status" -eq 0 ]

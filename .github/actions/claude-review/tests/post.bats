@@ -193,6 +193,18 @@ posted_summary() {
   [ -z "$(calls_with pulls/comments/)" ]
 }
 
+@test "if the check of a thread fails, the thread is skipped and the review is posted" {
+  export GH_FAIL_THREAD_NOW=1
+  set_threads "$(thread "$(as_finding Old)" '[]' false)"
+  write_review '[{"path":"app.py","line":2,"body":"New"}]'
+  run bash "$ACTION_DIR/scripts/post.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"::warning::Could not check review thread T_1"* ]]
+  [ "$(count_calls resolveReviewThread)" -eq 0 ]
+  [ "$(count_calls /reviews)" -eq 1 ]
+  [ "$(count_calls --body-file)" -eq 1 ]
+}
+
 @test "a thread that a person resolves during the review is not changed" {
   export GH_THREAD_NOW_JSON='{"data":{"node":{"isResolved":true,"comments":{"totalCount":1}}}}'
   set_threads "$(thread "$(as_finding Old)" '[]' false)"

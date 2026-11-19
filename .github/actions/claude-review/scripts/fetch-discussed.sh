@@ -69,7 +69,7 @@ gh api graphql --paginate \
 
 jq --arg marker "$marker" --arg superseded "$superseded_marker" '
   # Keep only the threads that a bot account started with the marker.
-  map(select(.comments.nodes[0].body | contains($marker))
+  map(select((.comments.nodes[0].body // "") | contains($marker))
       | select(.comments.nodes[0].author.__typename == "Bot")
       | {
           path,
