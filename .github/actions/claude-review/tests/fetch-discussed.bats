@@ -55,6 +55,15 @@ finding=$'Use a constant here.\n\n<!-- claude-review-finding -->'
   [ "$(jq 'length' .pr-review/discussed.json)" -eq 0 ]
 }
 
+@test "a superseded finding with a reply is listed without the superseded note" {
+  superseded=$'**Superseded** by the review of `abc1234`. This finding is from an earlier review and may no longer apply. Resolve this thread when you have checked it.\n<!-- claude-review-superseded -->\n\n'"$finding"
+  set_threads "$(thread "$superseded" "[$(reply alice MEMBER 'Still deliberate.')]" false)"
+  run bash "$ACTION_DIR/scripts/fetch-discussed.sh"
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.[0].finding' .pr-review/discussed.json)" = "Use a constant here." ]
+  [ "$(jq -r '.[0].replies[0].body' .pr-review/discussed.json)" = "Still deliberate." ]
+}
+
 @test "open threads are listed too, marked as not resolved" {
   set_threads "$(thread "$finding" "[$(reply alice MEMBER 'Discussing')]" false)"
   run bash "$ACTION_DIR/scripts/fetch-discussed.sh"

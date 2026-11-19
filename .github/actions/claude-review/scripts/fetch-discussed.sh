@@ -32,8 +32,10 @@ set -euo pipefail
 
 threads="$RUNNER_TEMP/threads.json"
 
-# The hidden marker that post.sh adds to each finding that it posts.
+# The hidden markers that post.sh adds: to each finding that it posts, and to the note
+# at the top of an earlier finding that it marks as superseded.
 marker="<!-- claude-review-finding -->"
+superseded_marker="<!-- claude-review-superseded -->"
 
 # Review threads are available only through the GraphQL API, not the REST API.
 # post.sh uses the thread id and isResolved to resolve or mark old findings, and the
@@ -69,7 +71,7 @@ gh api graphql --paginate \
     }' \
   | jq -s '[.[].data.repository.pullRequest.reviewThreads.nodes[]]' > "$threads"
 
-jq --arg marker "$marker" '
+jq --arg marker "$marker" --arg superseded "$superseded_marker" '
   # Keep only the threads that a bot account started with the marker.
   map(select(.comments.nodes[0].body | contains($marker))
       | select(.comments.nodes[0].author.__typename == "Bot")
@@ -79,7 +81,10 @@ jq --arg marker "$marker" '
           line: (.line // .originalLine),
           resolved: .isResolved,
           # The finding text, without the marker.
-          finding: (.comments.nodes[0].body | split("\n\n" + $marker)[0]),
+          # If post.sh marked the finding as superseded, remove the note at the top.
+          finding: (.comments.nodes[0].body
+            | split($superseded + "\n\n") | last
+            | split("\n\n" + $marker)[0]),
           # The comments after the first, only from trusted persons.
           replies: [.comments.nodes[1:][]
             | select(.authorAssociation | IN("OWNER", "MEMBER", "COLLABORATOR"))
