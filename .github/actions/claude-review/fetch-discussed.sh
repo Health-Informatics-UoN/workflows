@@ -1,53 +1,48 @@
 #!/usr/bin/env bash
-# Fetches the PR's review threads once, for both this script and post.sh, and writes
-# .pr-review/discussed.json: findings from earlier reviews of this PR that people have
-# replied to, with their replies, so Claude doesn't raise a finding again after someone
-# has disagreed with it.
+# Gets the review threads of the PR one time, for this script and for post.sh. Then
+# writes .pr-review/discussed.json. This file contains the findings from earlier reviews
+# of this PR that have replies, and the replies. Thus, Claude does not show a finding
+# again after a person disagrees with it.
 #
 # Writes two files:
-#   $RUNNER_TEMP/threads.json  GitHub's full answer, for post.sh to deal with earlier
-#                              findings. It's outside the checkout on purpose: it holds
-#                              comments from anyone, which Claude mustn't read.
-#   .pr-review/discussed.json  the filtered list below, inside the checkout for Claude.
+#   $RUNNER_TEMP/threads.json  the full answer from GitHub. post.sh uses it for the
+#                              earlier findings. It is outside the checkout on purpose:
+#                              it contains comments from any person. Claude must not
+#                              read these comments.
+#   .pr-review/discussed.json  the filtered list below, in the checkout for Claude.
 #
-# Only replies from people with access to the repository (owners, organisation members
-# and collaborators) are included. Anyone can comment on a public PR, so other replies
-# could carry injected instructions. For the same reason, a thread only counts as an
-# earlier finding if its first comment was posted by a bot account, not just if it
-# contains the marker: anyone could copy the marker into a comment of their own.
+# This file includes only replies from persons with access to the repository (owners,
+# organisation members and collaborators). Any person can comment on a public PR, so
+# other replies can contain injected instructions. For the same reason, a thread is an
+# earlier finding only if a bot account posted its first comment. The marker alone is
+# not sufficient, because any person can copy the marker into a comment.
 #
 # Environment (set by action.yml):
 #   REPO         owner/name of the repository, for example org/repo
 #   PR_NUMBER    the PR number
-#   GH_TOKEN     token gh uses to read the PR
-#   RUNNER_TEMP  temporary folder outside the checkout
-# The current directory is the checkout; .pr-review/ already exists.
+#   GH_TOKEN     the token that gh uses to read the PR
+#   RUNNER_TEMP  a temporary folder outside the checkout
+# The current directory is the checkout. .pr-review/ exists already.
 #
 # Example discussed.json:
 #   [{"path": "app.py", "line": 2, "resolved": true,
 #     "finding": "Use a constant here.",
 #     "replies": [{"author": "alice", "body": "No, this is deliberate."}]}]
-set -euo pipefail  # Stop on any error, unset variable or failed command in a pipe.
+set -euo pipefail
 
 threads="$RUNNER_TEMP/threads.json"
 
-# The hidden marker post.sh adds to each finding it posts.
+# The hidden marker that post.sh adds to each finding that it posts.
 marker="<!-- claude-review-finding -->"
 
-# Review threads are only available through the GraphQL API, not the REST API.
-# For each thread the query gets:
-#   - its id and whether it's resolved (post.sh resolves or marks old findings);
-#   - its file and line. "line" is null when the code has changed since the comment
-#     (the thread is outdated); "originalLine" is then the line it was first posted on;
-#   - how many comments it has, and up to 20 of them, each with its id (post.sh edits
-#     old findings by id), text, author (and whether the author is a user or a bot),
-#     and the author's relationship to the repository (authorAssociation: OWNER,
-#     MEMBER, COLLABORATOR, CONTRIBUTOR, NONE and so on).
-# Checks the first 100 threads, which covers all but very long-running PRs.
-# REPO is "owner/name": ${REPO%/*} is the owner and ${REPO#*/} the name.
-#
-# The $ names in the query are GraphQL variables, not shell ones, so they're in single
-# quotes on purpose (shellcheck would otherwise warn about it).
+# Review threads are available only through the GraphQL API, not the REST API.
+# post.sh uses the thread id and isResolved to resolve or mark old findings, and the
+# comment databaseId to edit them. "line" is null if the code changed after the
+# comment (the thread is outdated). Then "originalLine" is the line of the first post.
+# The first 100 threads are sufficient for almost all PRs.
+# REPO is "owner/name": ${REPO%/*} is the owner and ${REPO#*/} is the name.
+# The $ names in the query are GraphQL variables, not shell variables. Thus, the
+# single quotes are on purpose.
 # shellcheck disable=SC2016
 gh api graphql \
   -f owner="${REPO%/*}" -f name="${REPO#*/}" -F number="$PR_NUMBER" -f query='
@@ -69,23 +64,21 @@ gh api graphql \
 
 jq --arg marker "$marker" '
   .data.repository.pullRequest.reviewThreads.nodes
-  # Keep threads that start with a finding from this action: the first comment has
-  # the marker and was posted by a bot account. A user can copy the marker, but
-  # cannot post as a bot. Then reshape each one.
+  # Keep only the threads that a bot account started with the marker.
   | map(select(.comments.nodes[0].body | contains($marker))
       | select(.comments.nodes[0].author.__typename == "Bot")
       | {
           path,
-          # The current line, or the original one if the thread is outdated.
+          # If the thread is outdated, use the original line.
           line: (.line // .originalLine),
           resolved: .isResolved,
           # The finding text, without the marker.
           finding: (.comments.nodes[0].body | split("\n\n" + $marker)[0]),
-          # The replies (every comment after the first), from trusted people only.
+          # The comments after the first, only from trusted persons.
           replies: [.comments.nodes[1:][]
             | select(.authorAssociation | IN("OWNER", "MEMBER", "COLLABORATOR"))
             | {author: .author.login, body}]
         }
-      # Drop findings with no trusted replies: there is nothing to tell Claude.
+      # Remove findings that have no trusted replies. Claude needs no data about them.
       | select(.replies | length > 0))
 ' "$threads" > .pr-review/discussed.json

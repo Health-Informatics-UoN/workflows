@@ -1,16 +1,17 @@
 #!/usr/bin/env bats
-# Tests for post.sh, with a fake gh.
+# These are the tests for post.sh.
 #
-# fixtures/pr.diff changes two files:
-#   app.py   hunk 1: new lines 1-4 (line 2 added)
-#            hunk 2: new lines 21-24 (lines 22 and 23 added). A removed line starting
-#            "-- " and an added line starting "++ " appear as "--- " and "+++ ", like
-#            file headers, to check they're counted as lines.
-#   old.txt  deleted, so nothing can be commented on.
-#   "my notes.txt"  new file with a space in its name: git adds a TAB after the name
-#            on the "+++" line. New line 1.
-#   café.py  a name git quotes and writes with backslash codes ("b/caf\303\251.py").
-#            New line 1.
+# fixtures/pr.diff changes these files:
+#   app.py   hunk 1: new lines 1-4 (line 2 is added)
+#            hunk 2: new lines 21-24 (lines 22 and 23 are added). The hunk has a removed
+#            line that starts with "-- " and an added line that starts with "++ ". In
+#            the diff, these lines show as "--- " and "+++ ", the same as file headers.
+#            The tests make sure that post.sh counts them as lines.
+#   old.txt  is deleted, so you cannot comment on it.
+#   "my notes.txt"  is a new file with a space in its name. Git adds a TAB after the
+#            name on the "+++" line. New line 1.
+#   café.py  has a name that git quotes and writes with backslash codes
+#            ("b/caf\303\251.py"). New line 1.
 
 load test_helper
 
@@ -18,15 +19,13 @@ setup() {
   common_setup
   mkdir -p .pr-review
   cp "$BATS_TEST_DIRNAME/fixtures/pr.diff" .pr-review/pr.diff
-  set_threads  # No review threads, unless a test sets some.
+  set_threads  # There are no review threads, unless a test sets them.
 }
 
-# The review posted to GitHub, as JSON.
 posted_review() {
   stdin_of /reviews
 }
 
-# The summary comment that was posted.
 posted_summary() {
   stdin_of --body-file
 }

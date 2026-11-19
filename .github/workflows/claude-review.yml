@@ -1,19 +1,20 @@
-# Reusable Claude PR review. Call it from a pull_request workflow (see
-# samples/check.claude-review.yaml) and pass ANTHROPIC_API_KEY explicitly.
+# This is the reusable Claude PR review. Call it from a pull_request workflow (see
+# samples/check.claude-review.yaml). Give ANTHROPIC_API_KEY explicitly.
 #
-# It reviews when a PR is opened, gets new commits or is marked ready for review, and
-# when someone adds the review label (by default `claude-review`), which requests a
-# review at any time, including on a draft. The label is removed afterwards, so it can
-# be added again. The caller's trigger must include the `labeled` type for this.
+# The workflow does a review when a PR opens, gets new commits or becomes ready for
+# review. It also does a review when someone adds the review label (by default
+# `claude-review`). The label requests a review at any time, also on a draft PR. The
+# workflow removes the label after the review, so that you can add it again. For this
+# function, the trigger of the caller must include the `labeled` type.
 name: Claude PR Review
 
 on:
   workflow_call:
     inputs:
-      # Defaults match the action's own defaults, which
-      # .github/actions/claude-review/tests/defaults.bats checks.
-      # The two limits go together: Claude spends turns reading files, so a larger PR
-      # needs more turns. Running out of turns fails the review.
+      # These defaults are the same as the defaults of the action.
+      # .github/actions/claude-review/tests/defaults.bats checks this.
+      # The two limits are related. Claude uses turns to read files, so a larger PR
+      # needs more turns. If Claude uses all its turns, the review fails.
       model:
         description: Claude model to use.
         type: string
@@ -39,10 +40,9 @@ permissions: {}
 
 jobs:
   review:
-    # Skip forks (no secrets) and Dependabot (no secrets). Dependabot is checked by who
-    # opened the PR, not github.actor, so a person re-running the job is still skipped.
-    # When a label is added, review only if it's the review label; it overrides the
-    # draft check, because someone asked for the review. Otherwise skip drafts.
+    # Skip forks and Dependabot, because they have no secrets. The Dependabot check uses
+    # the PR author, not github.actor. Thus, if a person runs the job again, the job
+    # is still skipped. The header above gives the label and draft rules.
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.user.login != 'dependabot[bot]' &&
@@ -54,8 +54,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-      pull-requests: write # Allows posting review comments; contents: read blocks pushes
-    # Cancel older in-progress runs if new commits are pushed to the same PR
+      pull-requests: write # Lets the job post comments. contents: read stops pushes.
     concurrency:
       group: claude-review-${{ github.event.pull_request.number }}
       cancel-in-progress: true
@@ -64,17 +63,17 @@ jobs:
       - name: Checkout PR code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The PR's own commit, not GitHub's test merge with the base branch, so Claude
-          # reads the same code as the diff its line numbers refer to. The test merge also
-          # doesn't exist when the PR has conflicts, which would fail the checkout.
+          # Use the commit of the PR, not the GitHub test merge with the base branch.
+          # Thus, Claude reads the same code as the diff that its line numbers refer to.
+          # Also, the test merge does not exist when the PR has conflicts.
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
-          # Don't leave the GitHub token in .git/config, where Claude could read it.
+          # Do not keep the GitHub token in .git/config. Claude can read that file.
           persist-credentials: false
 
-      # $/ resolves to this workflow's own repository at the commit that is running,
-      # so the action always matches the version of this workflow the caller pinned.
-      # Confirmed on real runs: the log shows "Run <this repo>/.github/actions/
+      # $/ is the repository of this workflow, at the commit that runs. Thus, the action
+      # is always the same version as the workflow that the caller pinned.
+      # Real runs confirm this. The log shows "Run <this repo>/.github/actions/
       # claude-review@<commit>", with the same commit as the workflow.
       - name: Claude review
         uses: $/.github/actions/claude-review
@@ -84,8 +83,8 @@ jobs:
           max-lines: ${{ inputs.max-lines }}
           max-turns: ${{ inputs.max-turns }}
 
-      # Remove the review label, even if the review failed, so adding it again
-      # requests another review.
+      # Remove the review label, also if the review failed. Then, if someone adds the
+      # label again, the label requests another review.
       - name: Remove review label
         if: always() && github.event.action == 'labeled'
         env:

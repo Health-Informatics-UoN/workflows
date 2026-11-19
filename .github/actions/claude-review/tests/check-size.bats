@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests for check-size.sh.
+# These are the tests for check-size.sh.
 
 load test_helper
 

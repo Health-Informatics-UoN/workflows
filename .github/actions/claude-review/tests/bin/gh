@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Fake gh for the tests. Records each call in $GH_CALLS (NNN.args, one argument per
-# line, and NNN.stdin when the call reads stdin) and answers from environment
-# variables holding raw API responses. A --jq/-q filter is applied to the response
-# with jq, as gh does, so the scripts' filters are tested too.
+# This is a fake gh for the tests. It records each call in $GH_CALLS (NNN.args, with
+# one argument on each line, and NNN.stdin if the call reads stdin). It gives answers
+# from environment variables that contain raw API responses. It applies a --jq/-q
+# filter to the response with jq, as gh does. Thus, the tests also test the filters
+# in the scripts.
 set -euo pipefail
 
 n=$(printf '%03d' $(( $(find "$GH_CALLS" -name '*.args' | wc -l) + 1 )))

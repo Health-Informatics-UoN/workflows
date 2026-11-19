@@ -1,70 +1,70 @@
 #!/usr/bin/env bash
-# Posts the findings in $RUNNER_TEMP/review.json to the PR:
-#   1. Deals with the findings from earlier runs that nobody has replied to: resolves
-#      them if the token is allowed to, or marks them as superseded if not.
-#   2. Posts the findings as one review, so there is one notification per run.
-#   3. Posts a new summary comment at the bottom of the PR, and deletes the previous one.
-# Findings GitHub won't attach to a line (not in the diff) are listed in the summary
-# instead, so none are lost.
+# This script posts the findings in $RUNNER_TEMP/review.json to the PR:
+#   1. It processes the findings from earlier runs that have no replies. If the token
+#      has permission, it resolves them. If not, it marks them as superseded.
+#   2. It posts the findings as one review, so each run makes one notification.
+#   3. It posts a new summary comment at the bottom of the PR and deletes the old one.
+# GitHub does not attach a finding to a line that is not in the diff. The summary shows
+# these findings, so no finding is lost.
 #
-# Environment (set by action.yml):
-#   REPO        owner/name of the repository, for example org/repo
+# Environment (action.yml sets these values):
+#   REPO        the owner/name of the repository, for example org/repo
 #   PR_NUMBER   the PR number
-#   HEAD_SHA    the PR commit that was reviewed; comments are attached to it
-#   GH_TOKEN    token gh uses; needs pull-requests: write
-#   RUNNER_TEMP folder holding review.json from review.sh, and threads.json (the PR's
-#               review threads) from fetch-discussed.sh
-# The current directory is the checkout, which holds the diff in .pr-review/pr.diff.
-set -euo pipefail  # Stop on any error, unset variable or failed command in a pipe.
+#   HEAD_SHA    the PR commit that Claude reviewed. The comments attach to this commit.
+#   GH_TOKEN    the token that gh uses. It needs pull-requests: write.
+#   RUNNER_TEMP the folder that contains review.json from review.sh, and threads.json
+#               (the review threads of the PR) from fetch-discussed.sh
+# The current directory is the checkout. It contains the diff in .pr-review/pr.diff.
+set -euo pipefail
 
 out="$RUNNER_TEMP/review.json"
 threads_file="$RUNNER_TEMP/threads.json"
 diff=".pr-review/pr.diff"
 
-# Hidden markers that identify this action's comments on later runs. They're HTML
-# comments, so GitHub doesn't show them, but they stay in the comment text.
+# Hidden markers identify the comments of this action on later runs. They are HTML
+# comments. GitHub does not show them, but they stay in the comment text.
 finding_marker="<!-- claude-review-finding -->"
 summary_marker="<!-- claude-review-summary -->"
 superseded_marker="<!-- claude-review-superseded -->"
 
-# --- Which lines can a comment attach to? -------------------------------------------
+# --- Find the lines that can have a comment ------------------------------------------
 #
-# GitHub only accepts a review comment on a line that appears in the PR diff: an added
-# line or an unchanged line shown around it (a "context" line). A comment on any other
-# line makes GitHub reject the whole review, so each finding is checked first.
+# GitHub accepts a review comment only on a line in the PR diff. This is an added line
+# or an unchanged line near it (a "context" line). If a comment is on a different line,
+# GitHub rejects the full review. Thus, the script checks each finding first.
 #
-# A diff looks like this:
+# This is an example of a diff:
 #
-#   diff --git a/app.py b/app.py        <- a new file starts
+#   diff --git a/app.py b/app.py        <- the start of a new file
 #   --- a/app.py
 #   +++ b/app.py                        <- the file name, after "+++ b/"
 #   @@ -1,3 +1,4 @@                     <- a "hunk": +1 means it starts at new line 1
-#    import os                          <- context line: new line 1
-#   +import sys                         <- added line: new line 2
-#   -import re                          <- removed line: not in the new file
+#    import os                          <- a context line: new line 1
+#   +import sys                         <- an added line: new line 2
+#   -import re                          <- a removed line: not in the new file
 #
-# The awk program reads the diff line by line and prints "file<TAB>line<TAB>hunk" for
-# each line that can be commented on. The hunk number is printed too, because a comment
-# on a range of lines must start and end in the same hunk.
+# The awk program reads the diff one line at a time. For each line that can have a
+# comment, it prints "file<TAB>line<TAB>hunk". It also prints the hunk number, because
+# a comment on a range of lines must start and end in the same hunk.
 #
-# Inside a hunk, a removed line "-- x" appears as "--- x", and an added line "++ x"
-# as "+++ x", like file headers. So "+++" is only read as a file name before the first
-# hunk of a file (when in_hunk is 0).
+# In a hunk, a removed line "-- x" shows as "--- x", and an added line "++ x" shows as
+# "+++ x". These are the same as file headers. Thus, the program reads "+++" as a file
+# name only before the first hunk of a file (when in_hunk is 0).
 #
-# Git writes some file names differently on the "+++" line:
-#   - a name with a space gets a TAB added at the end:  +++ b/my notes.txt<TAB>
-#   - a name with other unusual characters is quoted, with those characters written as
-#     backslash codes:  +++ "b/caf\303\251.py"  for café.py
-# The awk program undoes both, so the name matches the one Claude gives.
-# LC_ALL=C makes awk work in bytes, so the codes become the right bytes in any awk.
+# On the "+++" line, Git writes some file names in a different format:
+#   - If a name has a space, Git adds a TAB at the end:  +++ b/my notes.txt<TAB>
+#   - If a name has other unusual characters, Git puts it in quotes and writes those
+#     characters as backslash codes:  +++ "b/caf\303\251.py"  for café.py
+# The awk program reverses the two changes, so the name is the same as the Claude name.
+# LC_ALL=C makes awk use bytes, so the codes become the correct bytes in all awk types.
 #
-# jq then turns those lines into one JSON object: {"path": {"line": hunk number}},
+# Then jq changes these lines into one JSON object: {"path": {"line": hunk number}},
 # for example {"app.py": {"1": "1", "2": "1", "21": "2"}}.
 commentable=$(LC_ALL=C awk '
-  # Turns a quoted name from the diff back into the real name: removes the quotes,
-  # and turns each backslash code into its character: \NNN (an octal byte value),
-  # \t (TAB), \n (new line), or a backslash followed by any other character, which
-  # is that character.
+  # This function changes a quoted name from the diff back into the real name. It
+  # removes the quotes and changes each backslash code into its character: \NNN (an
+  # octal byte value), \t (TAB), \n (new line). A backslash followed by a different
+  # character becomes that character.
   function unquote(s,    out, i, c, next_c) {
     s = substr(s, 2, length(s) - 2)
     out = ""
@@ -83,45 +83,43 @@ commentable=$(LC_ALL=C awk '
     return out
   }
 
-  # A new file in the diff: forget the previous file, and wait for its header.
+  # A new file starts: wait for its header.
   /^diff --git / { file = ""; in_hunk = 0; next }
 
-  # The new file name, from "+++ b/path". A deleted file has "+++ /dev/null" and
-  # nothing to comment on, so its name is left empty.
+  # The new file name comes from "+++ b/path". A deleted file has "+++ /dev/null" and
+  # has no lines for comments, so the program keeps its name empty.
   !in_hunk && /^\+\+\+ / {
     path = substr($0, 5)
     if (path == "/dev/null") { file = ""; next }
-    sub(/\t$/, "", path)                                 # the TAB after a name with a space
-    if (substr(path, 1, 1) == "\"") path = unquote(path)  # a quoted name
+    sub(/\t$/, "", path)
+    if (substr(path, 1, 1) == "\"") path = unquote(path)
     file = substr(path, 3)                               # remove the "b/"
     next
   }
 
-  # A hunk header, "@@ -a,b +c,d @@": count the hunk, and start counting new lines at c.
+  # A hunk header, "@@ -a,b +c,d @@": add 1 to the hunk count. Count new lines from c.
   /^@@ / {
     in_hunk = 1; hunk++
     match($0, /\+[0-9]+/); line = substr($0, RSTART + 1, RLENGTH - 1)
     next
   }
 
-  # A context line (starts with a space) or an added line (starts with +) is in the
-  # new file, so it can be commented on. Removed lines (start with -) are skipped and
-  # not counted, as they are not in the new file.
+  # Context lines (space) and added lines (+) are in the new file. Removed lines (-)
+  # are not, so the program does not count them.
   in_hunk && file != "" && /^[ +]/ { print file "\t" line "\t" hunk; line++ }
 ' "$diff" | jq -Rn 'reduce (inputs | split("\t")) as [$p, $l, $h] ({}; .[$p][$l] = $h)')
 
 # --- Sort the findings ----------------------------------------------------------------
 #
-# Splits the findings into:
-#   comments:   ones on a line in the diff, in the shape the GitHub reviews API expects
-#   unanchored: the rest, which go in the summary instead
-# Each comment gets the hidden marker, so the next run can find it.
-# A finding with a start_line becomes a multi-line comment, but only if the range is
-# the right way round and within one hunk; otherwise the start_line is dropped and the
-# comment goes on the last line only.
-# "side": "RIGHT" means the new version of the file, not the old one.
+# The script divides the findings into two groups:
+#   comments:   findings on a line in the diff, in the format of the GitHub reviews API
+#   unanchored: all other findings. The summary shows these findings.
+# A finding with a start_line becomes a multi-line comment, but only if the range is in
+# the correct order and in one hunk. If not, the script removes the start_line and puts
+# the comment on the last line only.
+# "side": "RIGHT" means the new version of the file, not the old version.
 split=$(jq --argjson ok "$commentable" --arg marker "$finding_marker" '
-  # The hunk a line is in, or null if the line is not in the diff.
+  # The hunk that contains a line, or null if the line is not in the diff.
   def hunk($p; $l): $ok[$p][($l | tostring)];
 
   .structured_output.findings
@@ -135,22 +133,18 @@ split=$(jq --argjson ok "$commentable" --arg marker "$finding_marker" '
   | {comments: map(.comment // empty), unanchored: map(.unanchored // empty)}
 ' "$out")
 
-# --- 1. Earlier findings nobody has replied to ---------------------------------------
+# --- 1. Earlier findings that have no replies ----------------------------------------
 #
-# Each run reviews the whole PR again, so this run's findings replace the earlier ones.
-# The earlier ones are resolved if the token is allowed to. The default workflow token
-# isn't (GitHub answers "Resource not accessible by integration"), and this action
-# doesn't ask for more permission. In that case the finding is marked as superseded
-# instead: a note is added to the top of the bot's own comment, which the token can
-# edit. People then resolve those threads. A finding already marked is skipped.
-# A thread with a reply is a conversation between people, so it's left alone.
+# Each run reviews the full PR again, so its findings replace the earlier findings.
+# The default workflow token cannot resolve threads (GitHub answers "Resource not
+# accessible by integration"), and this action does not ask for more permission. Then
+# the script adds a superseded note to the top of the bot comment, which the token can
+# edit, and people resolve the thread. A thread with a reply is a conversation between
+# people, so the script does not change it.
 #
-# The review threads were fetched once by fetch-discussed.sh, before Claude ran, and
-# saved to $RUNNER_TEMP/threads.json. This filter keeps the open threads with one
-# comment (no replies), started by a bot account with our marker, and not yet marked
-# as superseded, and prints each as one line of JSON. Checking for a bot matters
-# because anyone can copy the marker into a comment of their own; this way a person's
-# comment is never changed.
+# The filter keeps the open threads without replies that a bot started with our marker
+# and that do not have the superseded mark. The bot check is important, because anyone
+# can copy the marker into their own comment.
 threads=$(jq -r --arg finding "$finding_marker" --arg superseded "$superseded_marker" '
   .data.repository.pullRequest.reviewThreads.nodes[]
   | select(.isResolved | not)
@@ -174,7 +168,7 @@ while IFS= read -r thread; do
     continue
   fi
 
-  # Not allowed to resolve it: add the superseded note to the top of the comment.
+  # The token cannot resolve the thread, so mark the comment as superseded.
   comment=$(jq -r '.comment' <<< "$thread")
   if jq -r --arg sha "${HEAD_SHA:0:7}" --arg marker "$superseded_marker" \
        '"**Superseded** by the review of `\($sha)`. This finding is from an earlier review and may no longer apply. Resolve this thread when you have checked it.\n\($marker)\n\n" + .body' \
@@ -192,12 +186,9 @@ fi
 
 # --- 2. Post the findings as one review ----------------------------------------------
 #
-# One review with all the comments, rather than one comment per finding, so people get
-# one notification. "event": "COMMENT" posts it without approving or requesting changes.
-# commit_id ties the comments to the commit that was reviewed.
-#
-# If GitHub still rejects the review, move every finding into the summary, without
-# the hidden marker, so none are lost.
+# "event": "COMMENT" does not approve the PR or request changes. If GitHub rejects the
+# review after these checks, the script moves all findings into the summary without
+# the hidden marker. Thus, no finding is lost.
 count=$(jq '.comments | length' <<< "$split")
 if [ "$count" -gt 0 ]; then
   if ! jq --arg sha "$HEAD_SHA" \
@@ -212,12 +203,9 @@ fi
 
 # --- 3. Post the summary at the bottom, and delete the previous one -------------------
 #
-# There's one summary on the PR at a time. Each run posts a new one, so it appears at
-# the bottom of the conversation and notifies people that the review ran, then deletes
-# the previous one. (Editing the previous one instead would leave the latest review
-# far up the PR, where nobody looks, with no notification.)
-# It holds: the hidden marker, the commit reviewed and number of inline findings,
-# Claude's summary, and any findings that couldn't be attached to a line.
+# A new summary at the bottom tells people that the review ran. If the script edits the
+# previous summary, the latest review stays far up in the PR, where people do not look,
+# and nobody gets a notification.
 body=$(
   printf '%s\n' "$summary_marker"
   printf '**Claude review** of %s: %s inline finding(s).\n\n' "${HEAD_SHA:0:7}" "$count"
@@ -229,14 +217,13 @@ body=$(
       else empty end' <<< "$split"
 )
 
-# Find the summaries from earlier runs: comments by a bot account that contain the
-# marker. Checking it's a bot stops a person's comment that quotes the marker from
-# being deleted. --paginate reads every page of comments.
+# Find the summaries from earlier runs. The bot check makes sure that the script does
+# not delete a comment from a person that quotes the marker.
 previous=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
   --jq ".[] | select(.user.type == \"Bot\" and (.body | contains(\"$summary_marker\"))) | .id")
 
-# Post the new summary first, so the PR is never left without one if a step fails.
-# The body is passed on stdin ("-"), so its text is never treated as shell code.
+# Post the new summary first. Then, if a step fails, the PR always has a summary.
+# The script sends the body on stdin ("-"), so the shell never runs its text as code.
 printf '%s' "$body" | gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file -
 
 for id in $previous; do

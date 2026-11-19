@@ -1,16 +1,17 @@
 #!/usr/bin/env bats
-# Checks that the reusable workflow's input defaults match the action's.
+# These tests make sure that the input defaults of the reusable workflow are the same
+# as the input defaults of the action.
 #
-# The workflow passes its inputs to the action, so the workflow's defaults are what
-# callers get. Both define defaults, though, and if they drift apart, using the action
-# directly behaves differently from using the workflow.
+# The workflow gives its inputs to the action, so callers get the workflow defaults.
+# But the workflow and the action each define defaults. If the two sets of defaults
+# become different, the action behaves differently when you use it directly.
 
 load test_helper
 
 WORKFLOW="$ACTION_DIR/../../workflows/claude-review.yml"
 
-# Prints the default of input $1 in YAML file $2, without quotes. Finds the line
-# "<input>:" and prints the value of the first "default:" after it.
+# Shows the default of input $1 in YAML file $2, without quotes. It finds the line
+# "<input>:" and shows the value of the first "default:" after that line.
 default_of() {
   awk -v name="$1" '
     $1 == name ":" { found = 1; next }

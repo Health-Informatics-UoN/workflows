@@ -18,8 +18,8 @@ inputs:
   model:
     description: Claude model to use.
     default: claude-opus-5-5
-  # The two limits go together: Claude spends turns reading files, so a larger PR
-  # needs more turns. Running out of turns fails the review.
+  # The two limits are related. Claude uses turns to read files, so a larger PR needs
+  # more turns. If Claude uses all turns, the review fails.
   max-turns:
     description: Maximum number of Claude turns per review; limits cost.
     default: "25"
@@ -43,11 +43,8 @@ runs:
         MAX_LINES: ${{ inputs.max-lines }}
       run: bash "$GITHUB_ACTION_PATH/check-size.sh"
 
-    # Fetched here so the Claude step has no GitHub token and no shell. Comments
-    # aren't fetched: anyone can post them, so they could carry injected instructions.
-    # The exception is replies to this action's earlier findings (threads a bot account
-    # started), and only replies from people with access to the repository (see
-    # fetch-discussed.sh).
+    # This step gets the PR, so the Claude step needs no GitHub token. It does not give
+    # Claude untrusted comments (refer to fetch-pr.sh and fetch-discussed.sh).
     - name: Fetch PR
       if: steps.size.outputs.too-large == 'false'
       shell: bash
@@ -61,17 +58,17 @@ runs:
         bash "$GITHUB_ACTION_PATH/fetch-pr.sh"
         bash "$GITHUB_ACTION_PATH/fetch-discussed.sh"
 
-    # Claude Code needs Node 22 or later. Set it here rather than relying on the runner
-    # image's default, which changes over time (Ubuntu 24.04 images defaulted to Node 20)
-    # and may be missing on self-hosted runners.
+    # Claude Code needs Node 22 or later. The default of the runner image changes over
+    # time (it was Node 20 on Ubuntu 24.04), and self-hosted runners possibly do not
+    # have Node.js.
     - name: Set up Node.js
       if: steps.size.outputs.too-large == 'false'
       uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
         node-version: 24
 
-    # Installs the Claude Code version pinned in package-lock.json, checking every
-    # package against its recorded checksum. Dependabot proposes updates.
+    # Installs the Claude Code version that package-lock.json pins. npm compares each
+    # package with its recorded checksum. Dependabot proposes updates.
     - name: Install Claude Code
       if: steps.size.outputs.too-large == 'false'
       shell: bash

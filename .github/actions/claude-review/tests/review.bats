@@ -1,12 +1,12 @@
 #!/usr/bin/env bats
-# Tests for review.sh, with a fake Claude Code.
+# These are the tests for review.sh.
 
 load test_helper
 
 setup() {
   common_setup
-  # review.sh runs $GITHUB_ACTION_PATH/node_modules/.bin/claude and reads the prompt,
-  # standards and schema from $GITHUB_ACTION_PATH.
+  # review.sh runs $GITHUB_ACTION_PATH/node_modules/.bin/claude. It reads the prompt,
+  # the standards and the schema from $GITHUB_ACTION_PATH.
   export GITHUB_ACTION_PATH="$BATS_TEST_TMPDIR/action"
   mkdir -p "$GITHUB_ACTION_PATH/node_modules/.bin"
   for file in prompt.md standards.md schema.json; do
@@ -18,7 +18,7 @@ setup() {
   export CLAUDE_OUTPUT='{"is_error":false,"num_turns":3,"structured_output":{"findings":[],"summary":"No findings."}}'
 }
 
-# True if the fake claude was given argument $1 followed by $2.
+# Returns true if the fake claude got argument $1, followed by argument $2.
 has_arg_pair() {
   awk -v a="$1" -v b="$2" 'prev == a && $0 == b { found = 1 } { prev = $0 } END { exit !found }' "$CLAUDE_ARGS"
 }
@@ -57,8 +57,8 @@ has_arg_pair() {
   grep -qF "# Review standards" "$CLAUDE_ARGS"
 }
 
-# The protections in review.sh are all command-line flags. These tests fail if one is
-# removed, so a protection can't disappear unnoticed.
+# All the protections in review.sh are command-line flags. If someone removes a flag,
+# these tests fail. Thus, a protection cannot disappear without notice.
 @test "Claude has only the Read, Grep and Glob tools" {
   run bash "$ACTION_DIR/review.sh"
   has_arg_pair --tools "Read,Grep,Glob"

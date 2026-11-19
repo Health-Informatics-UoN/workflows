@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests for fetch-pr.sh, with a fake gh.
+# These are the tests for fetch-pr.sh.
 
 load test_helper
 

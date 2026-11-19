@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests for fetch-discussed.sh, with a fake gh.
+# These are the tests for fetch-discussed.sh.
 
 load test_helper
 
