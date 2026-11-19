@@ -9,7 +9,7 @@ The steps are in [`action.yml`](action.yml). Each one runs a script from this fo
 | Step | Script | What it does |
 |---|---|---|
 | Check PR size | [`check-size.sh`](check-size.sh) | Skips pull requests over `max-lines` changed lines, and comments once to say so. |
-| Fetch PR | inline, plus [`fetch-discussed.sh`](fetch-discussed.sh) | Saves the PR details, the diff, and earlier findings people have replied to, in `.pr-review/` in the checkout. |
+| Fetch PR | [`fetch-pr.sh`](fetch-pr.sh), then [`fetch-discussed.sh`](fetch-discussed.sh) | Saves the PR details, the diff for the exact commits being reviewed, and earlier findings people have replied to, in `.pr-review/` in the checkout. |
 | Set up Node.js | `actions/setup-node` | Installs Node 24. Claude Code needs Node 22 or later, and the runner image's default changes over time. |
 | Install Claude Code | inline | `npm ci` installs the version pinned in [`package-lock.json`](package-lock.json), checking every package's checksum. |
 | Run Claude review | [`review.sh`](review.sh) | Runs Claude Code read-only with [`prompt.md`](prompt.md) and [`standards.md`](standards.md), and saves its findings. |
@@ -24,7 +24,7 @@ Each script starts with a comment explaining what it does and which environment 
 | File | Purpose |
 |---|---|
 | `action.yml` | The action: inputs and steps. |
-| `check-size.sh`, `fetch-discussed.sh`, `review.sh`, `post.sh` | The logic, kept out of the YAML so it can be read, checked with ShellCheck and tested. |
+| `check-size.sh`, `fetch-pr.sh`, `fetch-discussed.sh`, `review.sh`, `post.sh` | The logic, kept out of the YAML so it can be read, checked with ShellCheck and tested. |
 | `prompt.md` | Instructions to Claude: where the PR is, what to return, how to write it. |
 | `standards.md` | What counts as a problem. A repository's own `REVIEW.md` or `CLAUDE.md` takes precedence. |
 | `schema.json` | The shape Claude's answer must have: findings (file, line, optional start line, comment) and a summary. |
@@ -48,13 +48,14 @@ The tests in `tests/review.bats` fail if any of these flags is removed.
 - **Findings** are posted as one review per run, so there's one notification. Each finding is on a line, or a range of lines, in the diff. GitHub only accepts comments on lines that appear in the diff, so `post.sh` reads the diff first and moves any finding on another line into the summary.
 - **The summary** is one comment, edited by each run rather than posted again.
 - **Earlier findings** that nobody has replied to are resolved at the start of each run, so only the current findings are open. The base branch may require all threads to be resolved before merging.
-- **Hidden markers** (HTML comments, which GitHub doesn't show) identify the action's own comments on later runs: `<!-- claude-review-finding -->`, `<!-- claude-review-summary -->` and `<!-- claude-review-too-large -->`.
+- **Hidden markers** (HTML comments, which GitHub doesn't show) identify the action's own comments on later runs: `<!-- claude-review-finding -->`, `<!-- claude-review-summary -->` and `<!-- claude-review-too-large -->`. Anyone can copy a marker into a comment of their own, so a comment only counts as the action's if it also comes from a bot account.
+- **One commit throughout:** the checkout, the diff and the comments all use the commit from the event that started the run, so a push during a review can't make the line numbers point at different code.
 
 ## Disagreeing with a finding
 
 When someone replies to a finding, the next run doesn't resolve that thread: it's now a conversation between people. `fetch-discussed.sh` collects the findings people have replied to, with their replies, into `.pr-review/discussed.json`, and `prompt.md` tells Claude not to raise them again unless the code has changed in a way the reply doesn't cover.
 
-Only replies from owners, organisation members and collaborators are included, for the same reason comments aren't fetched.
+Only replies from owners, organisation members and collaborators are included, for the same reason comments aren't fetched. And a thread only counts as an earlier finding if a bot account started it, so a person can't post their own "finding" with a copied marker and have it passed to Claude once someone replies.
 
 ## Tests
 
@@ -76,7 +77,8 @@ CI runs them on Ubuntu. macOS's own `awk` may behave slightly differently from U
 | `check-size.bats` | Tests for `check-size.sh`: under, at and over the limit, and commenting only once. |
 | `review.bats` | Tests for `review.sh`: the arguments passed to Claude, including every security flag, and each kind of failure. |
 | `post.bats` | Tests for `post.sh`: which lines comments attach to, ranges, the summary, resolving earlier threads, and what happens when GitHub rejects a call. |
-| `fetch-discussed.bats` | Tests for `fetch-discussed.sh`: which replies are passed to Claude and which are left out. |
+| `fetch-pr.bats` | Tests for `fetch-pr.sh`: the diff is for the exact commits in the event, and a `.pr-review` folder in the PR is replaced. |
+| `fetch-discussed.bats` | Tests for `fetch-discussed.sh`: which replies are passed to Claude and which are left out, including threads a person started with a copied marker. |
 | `defaults.bats` | Checks that the reusable workflow's input defaults match the action's, and that the limits are 2000 lines and 25 turns. |
 | `test_helper.bash` | Shared setup, and helpers for checking what the fake `gh` was asked to do. |
 | `bin/gh`, `bin/claude` | Fakes that stand in for the real programs (see below). |

@@ -96,9 +96,9 @@ posted_summary() {
 
 @test "only this action's open threads from earlier runs are resolved" {
   export GH_THREADS_JSON='{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
-    {"id":"T_ours_open","isResolved":false,"comments":{"totalCount":1,"nodes":[{"body":"Old\n\n<!-- claude-review-finding -->"}]}},
-    {"id":"T_ours_resolved","isResolved":true,"comments":{"totalCount":1,"nodes":[{"body":"Old\n\n<!-- claude-review-finding -->"}]}},
-    {"id":"T_person","isResolved":false,"comments":{"totalCount":1,"nodes":[{"body":"A reviewer comment"}]}}
+    {"id":"T_ours_open","isResolved":false,"comments":{"totalCount":1,"nodes":[{"body":"Old\n\n<!-- claude-review-finding -->","author":{"__typename":"Bot"}}]}},
+    {"id":"T_ours_resolved","isResolved":true,"comments":{"totalCount":1,"nodes":[{"body":"Old\n\n<!-- claude-review-finding -->","author":{"__typename":"Bot"}}]}},
+    {"id":"T_person","isResolved":false,"comments":{"totalCount":1,"nodes":[{"body":"A reviewer comment","author":{"__typename":"User"}}]}}
   ]}}}}}'
   write_review '[]'
   run bash "$ACTION_DIR/post.sh"
@@ -107,10 +107,20 @@ posted_summary() {
   grep -qx "id=T_ours_open" "$(calls_with resolveReviewThread)"
 }
 
+@test "a person's thread containing a copied marker isn't resolved" {
+  export GH_THREADS_JSON='{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+    {"id":"T_forged","isResolved":false,"comments":{"totalCount":1,"nodes":[{"body":"Mine\n\n<!-- claude-review-finding -->","author":{"__typename":"User"}}]}}
+  ]}}}}}'
+  write_review '[]'
+  run bash "$ACTION_DIR/post.sh"
+  [ "$status" -eq 0 ]
+  [ "$(count_calls resolveReviewThread)" -eq 0 ]
+}
+
 @test "a thread from an earlier run that someone has replied to is left open" {
   export GH_THREADS_JSON='{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
-    {"id":"T_replied","isResolved":false,"comments":{"totalCount":2,"nodes":[{"body":"Old\n\n<!-- claude-review-finding -->"}]}},
-    {"id":"T_no_reply","isResolved":false,"comments":{"totalCount":1,"nodes":[{"body":"Old\n\n<!-- claude-review-finding -->"}]}}
+    {"id":"T_replied","isResolved":false,"comments":{"totalCount":2,"nodes":[{"body":"Old\n\n<!-- claude-review-finding -->","author":{"__typename":"Bot"}}]}},
+    {"id":"T_no_reply","isResolved":false,"comments":{"totalCount":1,"nodes":[{"body":"Old\n\n<!-- claude-review-finding -->","author":{"__typename":"Bot"}}]}}
   ]}}}}}'
   write_review '[]'
   run bash "$ACTION_DIR/post.sh"
@@ -121,7 +131,7 @@ posted_summary() {
 
 @test "earlier threads are resolved before the new review is posted" {
   export GH_THREADS_JSON='{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
-    {"id":"T_old","isResolved":false,"comments":{"totalCount":1,"nodes":[{"body":"<!-- claude-review-finding -->"}]}}
+    {"id":"T_old","isResolved":false,"comments":{"totalCount":1,"nodes":[{"body":"<!-- claude-review-finding -->","author":{"__typename":"Bot"}}]}}
   ]}}}}}'
   write_review '[{"path":"app.py","line":2,"body":"New"}]'
   run bash "$ACTION_DIR/post.sh"
@@ -132,7 +142,7 @@ posted_summary() {
 
 @test "a thread that can't be resolved gives a warning, and the review is still posted" {
   export GH_FAIL_RESOLVE=1 GH_THREADS_JSON='{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
-    {"id":"T_old","isResolved":false,"comments":{"totalCount":1,"nodes":[{"body":"<!-- claude-review-finding -->"}]}}
+    {"id":"T_old","isResolved":false,"comments":{"totalCount":1,"nodes":[{"body":"<!-- claude-review-finding -->","author":{"__typename":"Bot"}}]}}
   ]}}}}}'
   write_review '[{"path":"app.py","line":2,"body":"New"}]'
   run bash "$ACTION_DIR/post.sh"

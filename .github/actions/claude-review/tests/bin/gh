@@ -38,6 +38,8 @@ case " $* " in
     respond '{}' ;;
   *"/issues/"*"/comments "*)
     respond "${GH_ISSUE_COMMENTS_JSON:-[]}" ;;
+  *"/compare/"*)
+    respond "${GH_COMPARE_DIFF:-}" ;;
   *" pr view "*)
     respond "${GH_PR_JSON:-$no_comments}" ;;
   *) ;;

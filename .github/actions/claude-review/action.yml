@@ -52,12 +52,10 @@ runs:
         GH_TOKEN: ${{ inputs.github-token }}
         REPO: ${{ github.repository }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       run: |
-        rm -rf .pr-review
-        mkdir .pr-review
-        gh pr view "$PR_NUMBER" --repo "$REPO" \
-          --json title,body,author,baseRefName,headRefName,files > .pr-review/pr.json
-        gh pr diff "$PR_NUMBER" --repo "$REPO" > .pr-review/pr.diff
+        bash "$GITHUB_ACTION_PATH/fetch-pr.sh"
         bash "$GITHUB_ACTION_PATH/fetch-discussed.sh"
 
     # Claude Code needs Node 22 or later. Set it here rather than relying on the runner

@@ -106,8 +106,10 @@ split=$(jq --argjson ok "$commentable" --arg marker "$finding_marker" '
 #
 # Review threads are only available through the GraphQL API, not the REST API.
 # The query gets each thread's id, whether it's resolved, how many comments it has,
-# and the text of its first comment (where the marker is). The --jq filter keeps the
-# open threads with one comment (no replies) that start with our marker.
+# and the text and author type of its first comment (where the marker is). The --jq
+# filter keeps the open threads with one comment (no replies) that a bot account
+# started with our marker. Checking for a bot matters because anyone can copy the
+# marker into a comment of their own; this way a person's comment is never resolved.
 # REPO is "owner/name": ${REPO%/*} is the owner and ${REPO#*/} the name.
 #
 # The $ names in the queries are GraphQL variables, not shell ones, so they're in
@@ -119,7 +121,10 @@ threads=$(gh api graphql \
       repository(owner: $owner, name: $name) {
         pullRequest(number: $number) {
           reviewThreads(first: 100) {
-            nodes { id isResolved comments(first: 1) { totalCount nodes { body } } }
+            nodes {
+              id isResolved
+              comments(first: 1) { totalCount nodes { body author { __typename } } }
+            }
           }
         }
       }
@@ -127,6 +132,7 @@ threads=$(gh api graphql \
   --jq ".data.repository.pullRequest.reviewThreads.nodes[]
         | select(.isResolved | not)
         | select(.comments.totalCount == 1)
+        | select(.comments.nodes[0].author.__typename == \"Bot\")
         | select(.comments.nodes[0].body | contains(\"$finding_marker\"))
         | .id")
 
