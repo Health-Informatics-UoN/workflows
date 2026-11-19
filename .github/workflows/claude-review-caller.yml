@@ -9,7 +9,11 @@ permissions: {}
 
 jobs:
   claude:
-    uses: ./.github/workflows/claude-review.yml
+    # ./ matches the other callers here. For a job-level call to a workflow in the same
+    # repository, ./ and $/ both load it from the same commit, before any step runs.
+    # Moving every same-repository call to $/ will be done together in a separate PR,
+    # which will also remove this ignore.
+    uses: ./.github/workflows/claude-review.yml # zizmor: ignore[self-repository]
     permissions:
       contents: read
       pull-requests: write

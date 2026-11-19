@@ -67,7 +67,6 @@ jobs:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
-Before the first run:
+Before the first run, add `ANTHROPIC_API_KEY` as a repository or organisation secret.
 
-- Add `ANTHROPIC_API_KEY` as a repository or organisation secret.
-- Create the `claude-review` label in the repository (Issues → Labels → New label). Adding a label needs triage access or higher, so not everyone who can comment can request a review.
+To let people request a review with the label, also create the `claude-review` label in the repository (Issues → Labels → New label, or `gh label create claude-review`). This is optional: without the label, pull requests are still reviewed automatically. Adding a label needs triage access or higher, so not everyone who can comment can request a review. If you don't want on-demand reviews, leave `labeled` out of the trigger types.
