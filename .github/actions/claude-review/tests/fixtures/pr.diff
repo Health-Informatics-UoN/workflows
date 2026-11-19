@@ -20,3 +20,16 @@ deleted file mode 100644
 @@ -1,2 +0,0 @@
 -gone
 -gone2
+diff --git a/my notes.txt b/my notes.txt
+new file mode 100644
+--- /dev/null
++++ b/my notes.txt	
+@@ -0,0 +1 @@
++hello
+diff --git "a/caf\303\251.py" "b/caf\303\251.py"
+index 333..444 100644
+--- "a/caf\303\251.py"
++++ "b/caf\303\251.py"
+@@ -1 +1 @@
+-x = 1
++x = 2

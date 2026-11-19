@@ -36,6 +36,8 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.github-token }}
         PR_URL: ${{ github.event.pull_request.html_url }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
         ADDITIONS: ${{ github.event.pull_request.additions }}
         DELETIONS: ${{ github.event.pull_request.deletions }}
         MAX_LINES: ${{ inputs.max-lines }}
@@ -43,8 +45,9 @@ runs:
 
     # Fetched here so the Claude step has no GitHub token and no shell. Comments
     # aren't fetched: anyone can post them, so they could carry injected instructions.
-    # The exception is replies to earlier findings from people with access to the
-    # repository (see fetch-discussed.sh).
+    # The exception is replies to this action's earlier findings (threads a bot account
+    # started), and only replies from people with access to the repository (see
+    # fetch-discussed.sh).
     - name: Fetch PR
       if: steps.size.outputs.too-large == 'false'
       shell: bash

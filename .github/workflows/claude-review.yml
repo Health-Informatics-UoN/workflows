@@ -74,6 +74,8 @@ jobs:
 
       # $/ resolves to this workflow's own repository at the commit that is running,
       # so the action always matches the version of this workflow the caller pinned.
+      # Confirmed on real runs: the log shows "Run <this repo>/.github/actions/
+      # claude-review@<commit>", with the same commit as the workflow.
       - name: Claude review
         uses: $/.github/actions/claude-review
         with:

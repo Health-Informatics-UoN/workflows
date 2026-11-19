@@ -34,7 +34,7 @@ case " $* " in
   *"/reviews "*)
     [ -z "${GH_FAIL_REVIEW:-}" ] || exit 1
     respond '{}' ;;
-  *" PATCH "*)
+  *" PATCH "*|*" DELETE "*)
     respond '{}' ;;
   *"/issues/"*"/comments "*)
     respond "${GH_ISSUE_COMMENTS_JSON:-[]}" ;;

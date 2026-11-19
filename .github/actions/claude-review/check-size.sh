@@ -10,6 +10,7 @@
 #   ADDITIONS, DELETIONS  lines added and removed by the PR, from the GitHub event
 #   MAX_LINES             the limit, from the max-lines input
 #   PR_URL                the PR, for gh
+#   REPO, PR_NUMBER       the repository (owner/name) and PR number, for the API
 #   GH_TOKEN              token gh uses to read and post comments
 #   GITHUB_OUTPUT         file GitHub Actions reads step outputs from
 set -euo pipefail  # Stop on any error, unset variable or failed command in a pipe.
@@ -27,8 +28,11 @@ echo "too-large=true" >> "$GITHUB_OUTPUT"
 # comment's text, where the next run can find it.
 marker="<!-- claude-review-too-large -->"
 
-# Get the text of every comment on the PR, one after another.
-comments=$(gh pr view "$PR_URL" --json comments -q '.comments[].body')
+# Get the text of every comment on the PR that a bot account posted. Only those count:
+# anyone could copy the marker into a comment of their own to stop the notice being
+# posted. --paginate reads every page of comments.
+comments=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+  --jq '.[] | select(.user.type == "Bot") | .body')
 
 # If an earlier run already said the PR is too large, don't say it again.
 if grep -qF "$marker" <<< "$comments"; then

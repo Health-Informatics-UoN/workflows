@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # Posts the findings in $RUNNER_TEMP/review.json to the PR:
-#   1. Resolves the review threads from earlier runs that nobody has replied to, so
-#      only the current findings are open (the base branch may require all threads
-#      resolved before merging).
+#   1. Deals with the findings from earlier runs that nobody has replied to: resolves
+#      them if the token is allowed to, or marks them as superseded if not.
 #   2. Posts the findings as one review, so there is one notification per run.
-#   3. Updates one summary comment in place, or creates it on the first run.
+#   3. Posts a new summary comment at the bottom of the PR, and deletes the previous one.
 # Findings GitHub won't attach to a line (not in the diff) are listed in the summary
 # instead, so none are lost.
 #
@@ -24,6 +23,7 @@ diff=".pr-review/pr.diff"
 # comments, so GitHub doesn't show them, but they stay in the comment text.
 finding_marker="<!-- claude-review-finding -->"
 summary_marker="<!-- claude-review-summary -->"
+superseded_marker="<!-- claude-review-superseded -->"
 
 # --- Which lines can a comment attach to? -------------------------------------------
 #
@@ -49,15 +49,51 @@ summary_marker="<!-- claude-review-summary -->"
 # as "+++ x", like file headers. So "+++" is only read as a file name before the first
 # hunk of a file (when in_hunk is 0).
 #
+# Git writes some file names differently on the "+++" line:
+#   - a name with a space gets a TAB added at the end:  +++ b/my notes.txt<TAB>
+#   - a name with other unusual characters is quoted, with those characters written as
+#     backslash codes:  +++ "b/caf\303\251.py"  for café.py
+# The awk program undoes both, so the name matches the one Claude gives.
+# LC_ALL=C makes awk work in bytes, so the codes become the right bytes in any awk.
+#
 # jq then turns those lines into one JSON object: {"path": {"line": hunk number}},
 # for example {"app.py": {"1": "1", "2": "1", "21": "2"}}.
-commentable=$(awk '
+commentable=$(LC_ALL=C awk '
+  # Turns a quoted name from the diff back into the real name: removes the quotes,
+  # and turns each backslash code into its character: \NNN (an octal byte value),
+  # \t (TAB), \n (new line), or a backslash followed by any other character, which
+  # is that character.
+  function unquote(s,    out, i, c, next_c) {
+    s = substr(s, 2, length(s) - 2)
+    out = ""
+    for (i = 1; i <= length(s); i++) {
+      c = substr(s, i, 1)
+      if (c != "\\") { out = out c; continue }
+      next_c = substr(s, i + 1, 1)
+      if (next_c ~ /[0-7]/) {
+        out = out sprintf("%c", substr(s, i + 1, 1) * 64 + substr(s, i + 2, 1) * 8 + substr(s, i + 3, 1))
+        i += 3
+      } else {
+        out = out (next_c == "t" ? "\t" : next_c == "n" ? "\n" : next_c)
+        i++
+      }
+    }
+    return out
+  }
+
   # A new file in the diff: forget the previous file, and wait for its header.
   /^diff --git / { file = ""; in_hunk = 0; next }
 
   # The new file name, from "+++ b/path". A deleted file has "+++ /dev/null" and
   # nothing to comment on, so its name is left empty.
-  !in_hunk && /^\+\+\+ / { file = ($0 == "+++ /dev/null") ? "" : substr($0, 7); next }
+  !in_hunk && /^\+\+\+ / {
+    path = substr($0, 5)
+    if (path == "/dev/null") { file = ""; next }
+    sub(/\t$/, "", path)                                 # the TAB after a name with a space
+    if (substr(path, 1, 1) == "\"") path = unquote(path)  # a quoted name
+    file = substr(path, 3)                               # remove the "b/"
+    next
+  }
 
   # A hunk header, "@@ -a,b +c,d @@": count the hunk, and start counting new lines at c.
   /^@@ / {
@@ -77,7 +113,7 @@ commentable=$(awk '
 # Splits the findings into:
 #   comments:   ones on a line in the diff, in the shape the GitHub reviews API expects
 #   unanchored: the rest, which go in the summary instead
-# Each comment gets the hidden marker, so the next run can find and resolve it.
+# Each comment gets the hidden marker, so the next run can find it.
 # A finding with a start_line becomes a multi-line comment, but only if the range is
 # the right way round and within one hunk; otherwise the start_line is dropped and the
 # comment goes on the last line only.
@@ -97,19 +133,24 @@ split=$(jq --argjson ok "$commentable" --arg marker "$finding_marker" '
   | {comments: map(.comment // empty), unanchored: map(.unanchored // empty)}
 ' "$out")
 
-# --- 1. Resolve earlier findings nobody has replied to -----------------------------------
+# --- 1. Earlier findings nobody has replied to ---------------------------------------
 #
-# Each run reviews the whole PR again, so the earlier findings are replaced by this
-# run's. Resolving the old threads means only the current findings are left open.
-# A thread with a reply is a conversation between people, so it's left for them to
-# resolve. Checks the first 100 threads, which covers all but very long-running PRs.
+# Each run reviews the whole PR again, so this run's findings replace the earlier ones.
+# The earlier ones are resolved if the token is allowed to. The default workflow token
+# isn't (GitHub answers "Resource not accessible by integration"), and this action
+# doesn't ask for more permission. In that case the finding is marked as superseded
+# instead: a note is added to the top of the bot's own comment, which the token can
+# edit. People then resolve those threads. A finding already marked is skipped.
+# A thread with a reply is a conversation between people, so it's left alone.
+# Checks the first 100 threads, which covers all but very long-running PRs.
 #
 # Review threads are only available through the GraphQL API, not the REST API.
 # The query gets each thread's id, whether it's resolved, how many comments it has,
-# and the text and author type of its first comment (where the marker is). The --jq
-# filter keeps the open threads with one comment (no replies) that a bot account
-# started with our marker. Checking for a bot matters because anyone can copy the
-# marker into a comment of their own; this way a person's comment is never resolved.
+# and the first comment's id, text and author type. The --jq filter keeps the open
+# threads with one comment (no replies), started by a bot account with our marker, and
+# not yet marked as superseded, and prints each as one line of JSON. Checking for a bot
+# matters because anyone can copy the marker into a comment of their own; this way a
+# person's comment is never changed.
 # REPO is "owner/name": ${REPO%/*} is the owner and ${REPO#*/} the name.
 #
 # The $ names in the queries are GraphQL variables, not shell ones, so they're in
@@ -123,7 +164,9 @@ threads=$(gh api graphql \
           reviewThreads(first: 100) {
             nodes {
               id isResolved
-              comments(first: 1) { totalCount nodes { body author { __typename } } }
+              comments(first: 1) {
+                totalCount nodes { databaseId body author { __typename } }
+              }
             }
           }
         }
@@ -134,16 +177,37 @@ threads=$(gh api graphql \
         | select(.comments.totalCount == 1)
         | select(.comments.nodes[0].author.__typename == \"Bot\")
         | select(.comments.nodes[0].body | contains(\"$finding_marker\"))
-        | .id")
+        | select(.comments.nodes[0].body | contains(\"$superseded_marker\") | not)
+        | {id, comment: .comments.nodes[0].databaseId, body: .comments.nodes[0].body}
+        | tojson")
 
-# Resolve each one. If GitHub refuses (for example, the token isn't allowed to), log a
-# warning and carry on: the new findings are more important.
-for id in $threads; do
+superseded=0
+while IFS= read -r thread; do
+  [ -n "$thread" ] || continue
+  id=$(jq -r '.id' <<< "$thread")
+
   # shellcheck disable=SC2016
-  gh api graphql -F id="$id" -f query='
-    mutation($id: ID!) { resolveReviewThread(input: {threadId: $id}) { thread { id } } }' \
-    > /dev/null || echo "::warning::Could not resolve review thread $id"
-done
+  if gh api graphql -F id="$id" -f query='
+       mutation($id: ID!) { resolveReviewThread(input: {threadId: $id}) { thread { id } } }' \
+       > /dev/null 2>&1; then
+    continue
+  fi
+
+  # Not allowed to resolve it: add the superseded note to the top of the comment.
+  comment=$(jq -r '.comment' <<< "$thread")
+  if jq -r --arg sha "${HEAD_SHA:0:7}" --arg marker "$superseded_marker" \
+       '"**Superseded** by the review of `\($sha)`. This finding is from an earlier review and may no longer apply. Resolve this thread when you have checked it.\n\($marker)\n\n" + .body' \
+       <<< "$thread" \
+     | gh api -X PATCH "repos/${REPO}/pulls/comments/${comment}" -F body=@- > /dev/null; then
+    superseded=$((superseded + 1))
+  else
+    echo "::warning::Could not resolve or mark review thread $id"
+  fi
+done <<< "$threads"
+
+if [ "$superseded" -gt 0 ]; then
+  echo "::notice::Marked $superseded earlier finding(s) as superseded; the token can't resolve review threads."
+fi
 
 # --- 2. Post the findings as one review ----------------------------------------------
 #
@@ -165,9 +229,12 @@ if [ "$count" -gt 0 ]; then
   fi
 fi
 
-# --- 3. Update the summary comment ---------------------------------------------------
+# --- 3. Post the summary at the bottom, and delete the previous one -------------------
 #
-# The summary is one comment that each run edits, rather than a new comment per run.
+# There's one summary on the PR at a time. Each run posts a new one, so it appears at
+# the bottom of the conversation and notifies people that the review ran, then deletes
+# the previous one. (Editing the previous one instead would leave the latest review
+# far up the PR, where nobody looks, with no notification.)
 # It holds: the hidden marker, the commit reviewed and number of inline findings,
 # Claude's summary, and any findings that couldn't be attached to a line.
 body=$(
@@ -181,18 +248,17 @@ body=$(
       else empty end' <<< "$split"
 )
 
-# Find the summary from an earlier run: a comment by a bot account that contains the
+# Find the summaries from earlier runs: comments by a bot account that contain the
 # marker. Checking it's a bot stops a person's comment that quotes the marker from
-# being treated as the summary. --paginate reads every page of comments; sed keeps the
-# first match.
-existing=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
-  --jq ".[] | select(.user.type == \"Bot\" and (.body | contains(\"$summary_marker\"))) | .id" \
-  | sed -n 1p)
+# being deleted. --paginate reads every page of comments.
+previous=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+  --jq ".[] | select(.user.type == \"Bot\" and (.body | contains(\"$summary_marker\"))) | .id")
 
-# Edit it if found (edits don't notify anyone); otherwise post a new one. The body is
-# passed on stdin ("@-" and "-"), so its text is never treated as shell code.
-if [ -n "$existing" ]; then
-  printf '%s' "$body" | gh api -X PATCH "repos/${REPO}/issues/comments/${existing}" -F body=@- > /dev/null
-else
-  printf '%s' "$body" | gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file -
-fi
+# Post the new summary first, so the PR is never left without one if a step fails.
+# The body is passed on stdin ("-"), so its text is never treated as shell code.
+printf '%s' "$body" | gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file -
+
+for id in $previous; do
+  gh api -X DELETE "repos/${REPO}/issues/comments/${id}" > /dev/null \
+    || echo "::warning::Could not delete the previous summary comment $id"
+done

@@ -6,9 +6,9 @@ It reviews when a pull request is opened, gets new commits or is marked ready fo
 
 Each run:
 
-- resolves the review threads from earlier runs that nobody has replied to, so only the current findings are open. A thread with a reply is left for people to resolve;
+- marks the findings from earlier runs that nobody has replied to as **superseded**, with a note at the top saying which review replaced them. The workflow's token isn't allowed to resolve review threads, so people resolve them. A thread with a reply is left alone;
 - posts its findings as one review, each on a line or range of lines in the diff;
-- updates the summary comment in place (it's created on the first run), including any findings that can't be attached to a line in the diff.
+- posts a new summary comment at the bottom of the pull request, and deletes the previous one. The summary includes any findings that can't be attached to a line in the diff.
 
 The review logic lives in a composite action, [`.github/actions/claude-review`](../../.github/actions/claude-review/). The workflow calls it with `$/`, which resolves to this repository at the same commit as the workflow, so the action always matches the version you pinned. The action's [README](../../.github/actions/claude-review/README.md) explains how it works, its security restrictions and its tests, for anyone changing it.
 

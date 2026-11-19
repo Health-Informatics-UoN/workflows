@@ -13,7 +13,7 @@ The steps are in [`action.yml`](action.yml). Each one runs a script from this fo
 | Set up Node.js | `actions/setup-node` | Installs Node 24. Claude Code needs Node 22 or later, and the runner image's default changes over time. |
 | Install Claude Code | inline | `npm ci` installs the version pinned in [`package-lock.json`](package-lock.json), checking every package's checksum. |
 | Run Claude review | [`review.sh`](review.sh) | Runs Claude Code read-only with [`prompt.md`](prompt.md) and [`standards.md`](standards.md), and saves its findings. |
-| Post review comments | [`post.sh`](post.sh) | Resolves earlier findings nobody replied to, posts the new findings as one review, and updates the summary comment. |
+| Post review comments | [`post.sh`](post.sh) | Marks earlier findings nobody replied to as superseded, posts the new findings as one review, and posts a new summary at the bottom of the PR. |
 
 The PR is fetched before Claude runs, so the Claude step needs no GitHub token. Claude gets the PR's title, description, files and diff, but not its comments: anyone can comment on a public PR, so comments could carry instructions meant to mislead the review. The one exception is replies to earlier findings from people with access to the repository (see [Disagreeing with a finding](#disagreeing-with-a-finding)).
 
@@ -46,8 +46,8 @@ The tests in `tests/review.bats` fail if any of these flags is removed.
 ## Comments on the PR
 
 - **Findings** are posted as one review per run, so there's one notification. Each finding is on a line, or a range of lines, in the diff. GitHub only accepts comments on lines that appear in the diff, so `post.sh` reads the diff first and moves any finding on another line into the summary.
-- **The summary** is one comment, edited by each run rather than posted again.
-- **Earlier findings** that nobody has replied to are resolved at the start of each run, so only the current findings are open. The base branch may require all threads to be resolved before merging.
+- **The summary** is one comment. Each run posts a new one, so it appears at the bottom of the conversation and notifies people, then deletes the previous one. (Editing it in place left the latest review far up the PR, where nobody saw it.)
+- **Earlier findings** that nobody has replied to are dealt with at the start of each run. `post.sh` tries to resolve them, but the default workflow token isn't allowed to ("Resource not accessible by integration"), and the action deliberately doesn't ask for more permission. So instead it adds a **Superseded** note to the top of each one, naming the review that replaced it, and people resolve them. The base branch may require all threads to be resolved before merging. If a caller passes a token that is allowed to resolve threads, as `github-token`, they're resolved instead.
 - **Hidden markers** (HTML comments, which GitHub doesn't show) identify the action's own comments on later runs: `<!-- claude-review-finding -->`, `<!-- claude-review-summary -->` and `<!-- claude-review-too-large -->`. Anyone can copy a marker into a comment of their own, so a comment only counts as the action's if it also comes from a bot account.
 - **One commit throughout:** the checkout, the diff and the comments all use the commit from the event that started the run, so a push during a review can't make the line numbers point at different code.
 
@@ -96,7 +96,7 @@ The tests run the real scripts, but with fake `gh` and `claude` programs, so not
   - fails on request (`GH_FAIL_REVIEW`, `GH_FAIL_RESOLVE`), to test what happens when GitHub rejects a call.
 - **Fake `claude`:** records its arguments and prints the output the test sets (`CLAUDE_OUTPUT`, `CLAUDE_EXIT`).
 
-The fakes only behave as written, so they can't show how the real GitHub API behaves, such as whether the token is allowed to resolve threads. Real pull requests show that. This repository's own PRs run the review through `claude-review-caller.yml`.
+The fakes only behave as written, so they can't show how the real GitHub API behaves. For example, real runs showed the workflow token can't resolve review threads, which no test could have. Real pull requests show that. This repository's own PRs run the review through `claude-review-caller.yml`.
 
 ### The sample diff in `tests/fixtures/pr.diff`
 
@@ -108,6 +108,8 @@ The fakes only behave as written, so they can't show how the real GitHub API beh
 | `app.py`, second hunk | 21–24 | A range across the two hunks (for example 3–22) is reduced to its last line. Line 10, between the hunks, isn't in the diff. |
 | A removed line shown as `--- …` and an added line shown as `+++ …` | 23 is the added one | Lines that look like file headers are still counted as lines. |
 | `old.txt`, deleted (`+++ /dev/null`) | none | A finding on a deleted file goes to the summary. |
+| `my notes.txt`, new | 1 | Git adds a TAB after a name with a space on the `+++` line; it's removed. |
+| `café.py` | 1 | Git quotes the name and writes the accent as backslash codes (`"b/caf\303\251.py"`); they're turned back into the real name. |
 
 ## Changing the action
 

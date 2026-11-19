@@ -32,9 +32,16 @@ setup() {
 }
 
 @test "a PR over the limit that already has the comment gets no second one" {
-  export GH_PR_JSON='{"comments":[{"body":"<!-- claude-review-too-large -->\nPR too large"}]}'
+  export GH_ISSUE_COMMENTS_JSON='[{"user":{"type":"Bot"},"body":"<!-- claude-review-too-large -->\nPR too large"}]'
   ADDITIONS=80 DELETIONS=30 run bash "$ACTION_DIR/check-size.sh"
   [ "$status" -eq 0 ]
   grep -qx "too-large=true" "$GITHUB_OUTPUT"
   [ -z "$(calls_with_arg comment)" ]
+}
+
+@test "a person's comment containing the marker doesn't stop the notice" {
+  export GH_ISSUE_COMMENTS_JSON='[{"user":{"type":"User"},"body":"<!-- claude-review-too-large -->"}]'
+  ADDITIONS=80 DELETIONS=30 run bash "$ACTION_DIR/check-size.sh"
+  [ "$status" -eq 0 ]
+  [ "$(calls_with_arg comment | grep -c .)" -eq 1 ]
 }
