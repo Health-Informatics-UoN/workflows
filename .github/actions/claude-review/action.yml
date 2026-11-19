@@ -41,7 +41,7 @@ runs:
         ADDITIONS: ${{ github.event.pull_request.additions }}
         DELETIONS: ${{ github.event.pull_request.deletions }}
         MAX_LINES: ${{ inputs.max-lines }}
-      run: bash "$GITHUB_ACTION_PATH/check-size.sh"
+      run: bash "$GITHUB_ACTION_PATH/scripts/check-size.sh"
 
     # This step gets the PR, so the Claude step needs no GitHub token. It does not give
     # Claude untrusted comments (refer to fetch-pr.sh and fetch-discussed.sh).
@@ -55,8 +55,8 @@ runs:
         BASE_SHA: ${{ github.event.pull_request.base.sha }}
         HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       run: |
-        bash "$GITHUB_ACTION_PATH/fetch-pr.sh"
-        bash "$GITHUB_ACTION_PATH/fetch-discussed.sh"
+        bash "$GITHUB_ACTION_PATH/scripts/fetch-pr.sh"
+        bash "$GITHUB_ACTION_PATH/scripts/fetch-discussed.sh"
 
     # Claude Code needs Node 22 or later. The default of the runner image changes over
     # time (it was Node 20 on Ubuntu 24.04), and self-hosted runners possibly do not
@@ -81,7 +81,7 @@ runs:
         ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
         MODEL: ${{ inputs.model }}
         MAX_TURNS: ${{ inputs.max-turns }}
-      run: bash "$GITHUB_ACTION_PATH/review.sh"
+      run: bash "$GITHUB_ACTION_PATH/scripts/review.sh"
 
     - name: Post review comments
       if: steps.size.outputs.too-large == 'false'
@@ -91,4 +91,4 @@ runs:
         REPO: ${{ github.repository }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
         HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-      run: bash "$GITHUB_ACTION_PATH/post.sh"
+      run: bash "$GITHUB_ACTION_PATH/scripts/post.sh"

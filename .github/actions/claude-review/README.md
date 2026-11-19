@@ -8,12 +8,12 @@ The steps are in [`action.yml`](action.yml). Each one runs a script from this fo
 
 | Step | Script | What it does |
 |---|---|---|
-| Check PR size | [`check-size.sh`](check-size.sh) | Skips pull requests over `max-lines` changed lines, and comments once to say so. |
-| Fetch PR | [`fetch-pr.sh`](fetch-pr.sh), then [`fetch-discussed.sh`](fetch-discussed.sh) | Saves the PR details, the diff for the exact commits being reviewed, and earlier findings people have replied to, in `.pr-review/` in the checkout. Also saves the PR's review threads to `$RUNNER_TEMP/threads.json`, outside the checkout, for `post.sh`: they're fetched once per run, and Claude can't read them. |
+| Check PR size | [`check-size.sh`](scripts/check-size.sh) | Skips pull requests over `max-lines` changed lines, and comments once to say so. |
+| Fetch PR | [`fetch-pr.sh`](scripts/fetch-pr.sh), then [`fetch-discussed.sh`](scripts/fetch-discussed.sh) | Saves the PR details, the diff for the exact commits being reviewed, and earlier findings people have replied to, in `.pr-review/` in the checkout. Also saves the PR's review threads to `$RUNNER_TEMP/threads.json`, outside the checkout, for `post.sh`: they're fetched once per run, and Claude can't read them. |
 | Set up Node.js | `actions/setup-node` | Installs Node 24. Claude Code needs Node 22 or later, and the runner image's default changes over time. |
 | Install Claude Code | inline | `npm ci` installs the version pinned in [`package-lock.json`](package-lock.json), checking every package's checksum. |
-| Run Claude review | [`review.sh`](review.sh) | Runs Claude Code read-only with [`prompt.md`](prompt.md) and [`standards.md`](standards.md), and saves its findings. |
-| Post review comments | [`post.sh`](post.sh) | Marks earlier findings nobody replied to as superseded, posts the new findings as one review, and posts a new summary at the bottom of the PR. |
+| Run Claude review | [`review.sh`](scripts/review.sh) | Runs Claude Code read-only with [`prompt/prompt.md`](prompt/prompt.md) and [`prompt/standards.md`](prompt/standards.md), and saves its findings. |
+| Post review comments | [`post.sh`](scripts/post.sh) | Marks earlier findings nobody replied to as superseded, posts the new findings as one review, and posts a new summary at the bottom of the PR. |
 
 The PR is fetched before Claude runs, so the Claude step needs no GitHub token. Claude gets the PR's title, description, files and diff, but not its comments: anyone can comment on a public PR, so comments could carry instructions meant to mislead the review. The one exception is replies to earlier findings from people with access to the repository (see [Disagreeing with a finding](#disagreeing-with-a-finding)).
 
@@ -24,10 +24,11 @@ Each script starts with a comment explaining what it does and which environment 
 | File | Purpose |
 |---|---|
 | `action.yml` | The action: inputs and steps. |
-| `check-size.sh`, `fetch-pr.sh`, `fetch-discussed.sh`, `review.sh`, `post.sh` | The logic, kept out of the YAML so it can be read, checked with ShellCheck and tested. |
-| `prompt.md` | Instructions to Claude: where the PR is, what to return, how to write it. |
-| `standards.md` | What counts as a problem. A repository's own `REVIEW.md` or `CLAUDE.md` takes precedence. |
-| `schema.json` | The shape Claude's answer must have: findings (file, line, optional start line, comment) and a summary. |
+| `scripts/` | The logic, kept out of the YAML so it can be read, checked with ShellCheck and tested: `check-size.sh`, `fetch-pr.sh`, `fetch-discussed.sh`, `review.sh` and `post.sh`. |
+| `prompt/` | What Claude is told. Changes here change the review, not the code. |
+| `prompt/prompt.md` | Instructions to Claude: where the PR is, what to return, how to write it. |
+| `prompt/standards.md` | What counts as a problem. A repository's own `REVIEW.md` or `CLAUDE.md` takes precedence. |
+| `prompt/schema.json` | The shape Claude's answer must have: findings (file, line, optional start line, comment) and a summary. |
 | `package.json`, `package-lock.json` | Pin the Claude Code version. Dependabot proposes updates. |
 | `tests/` | Unit tests for the scripts (see [Tests](#tests)). |
 
@@ -53,7 +54,7 @@ The tests in `tests/review.bats` fail if any of these flags is removed.
 
 ## Disagreeing with a finding
 
-When someone replies to a finding, the next run doesn't resolve that thread: it's now a conversation between people. `fetch-discussed.sh` collects the findings people have replied to, with their replies, into `.pr-review/discussed.json`, and `prompt.md` tells Claude not to raise them again unless the code has changed in a way the reply doesn't cover.
+When someone replies to a finding, the next run doesn't resolve that thread: it's now a conversation between people. `fetch-discussed.sh` collects the findings people have replied to, with their replies, into `.pr-review/discussed.json`, and `prompt/prompt.md` tells Claude not to raise them again unless the code has changed in a way the reply doesn't cover.
 
 Only replies from owners, organisation members and collaborators are included, for the same reason comments aren't fetched. And a thread only counts as an earlier finding if a bot account started it, so a person can't post their own "finding" with a copied marker and have it passed to Claude once someone replies.
 
@@ -113,7 +114,7 @@ The fakes only behave as written, so they can't show how the real GitHub API beh
 
 ## Changing the action
 
-- **The prompt or standards:** there's no automated check of review quality. Try a change on a real pull request before merging it.
+- **The prompt or standards** (in `prompt/`): there's no automated check of review quality. Try a change on a real pull request before merging it.
 - **The scripts:** add or update a test in `tests/`, and run ShellCheck (CI runs it on the `.sh` files). Comments inside the `awk` and `jq` programs must not contain apostrophes: the programs are inside single quotes in the shell, so a `'` ends them early.
 - **The Claude Code version:** Dependabot proposes updates to `package-lock.json`. Its install script, which puts the binary for the runner's platform in place, is approved by name in `allowScripts` in `package.json`.
 - **The workflow and the action together:** the reusable workflow calls this action with `$/`, so both always come from the same commit.

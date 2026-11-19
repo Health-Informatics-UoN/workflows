@@ -28,7 +28,7 @@ Only replies from people with access to the repository (owners, organisation mem
 
 ## Review standards
 
-Claude reviews against the [general standards](../../.github/actions/claude-review/standards.md). If your repository has a `REVIEW.md` or `CLAUDE.md`, Claude applies those too, and they win where they conflict.
+Claude reviews against the [general standards](../../.github/actions/claude-review/prompt/standards.md). If your repository has a `REVIEW.md` or `CLAUDE.md`, Claude applies those too, and they win where they conflict.
 
 ## Inputs
 

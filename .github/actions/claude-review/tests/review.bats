@@ -6,12 +6,10 @@ load test_helper
 setup() {
   common_setup
   # review.sh runs $GITHUB_ACTION_PATH/node_modules/.bin/claude. It reads the prompt,
-  # the standards and the schema from $GITHUB_ACTION_PATH.
+  # the standards and the schema from $GITHUB_ACTION_PATH/prompt.
   export GITHUB_ACTION_PATH="$BATS_TEST_TMPDIR/action"
   mkdir -p "$GITHUB_ACTION_PATH/node_modules/.bin"
-  for file in prompt.md standards.md schema.json; do
-    ln -s "$ACTION_DIR/$file" "$GITHUB_ACTION_PATH/$file"
-  done
+  ln -s "$ACTION_DIR/prompt" "$GITHUB_ACTION_PATH/prompt"
   ln -s "$BATS_TEST_DIRNAME/bin/claude" "$GITHUB_ACTION_PATH/node_modules/.bin/claude"
   export CLAUDE_ARGS="$BATS_TEST_TMPDIR/claude-args"
   export MODEL="claude-test-model" MAX_TURNS="7" ANTHROPIC_API_KEY="test-key"
@@ -25,7 +23,7 @@ has_arg_pair() {
 
 @test "an empty API key fails with a clear message, without running Claude" {
   export ANTHROPIC_API_KEY=""
-  run bash "$ACTION_DIR/review.sh"
+  run bash "$ACTION_DIR/scripts/review.sh"
   [ "$status" -eq 1 ]
   [[ "$output" == *"ANTHROPIC_API_KEY is empty"* ]]
   [ ! -e "$CLAUDE_ARGS" ]
@@ -33,26 +31,26 @@ has_arg_pair() {
 
 @test "a missing API key fails with a clear message" {
   unset ANTHROPIC_API_KEY
-  run bash "$ACTION_DIR/review.sh"
+  run bash "$ACTION_DIR/scripts/review.sh"
   [ "$status" -eq 1 ]
   [[ "$output" == *"ANTHROPIC_API_KEY is empty"* ]]
 }
 
 @test "a completed review passes and keeps Claude's output" {
-  run bash "$ACTION_DIR/review.sh"
+  run bash "$ACTION_DIR/scripts/review.sh"
   [ "$status" -eq 0 ]
   [ "$(jq -r '.structured_output.summary' "$RUNNER_TEMP/review.json")" = "No findings." ]
 }
 
 @test "the model and turn limit are passed to Claude" {
-  run bash "$ACTION_DIR/review.sh"
+  run bash "$ACTION_DIR/scripts/review.sh"
   [ "$status" -eq 0 ]
   has_arg_pair --model claude-test-model
   has_arg_pair --max-turns 7
 }
 
 @test "the prompt includes the review standards" {
-  run bash "$ACTION_DIR/review.sh"
+  run bash "$ACTION_DIR/scripts/review.sh"
   [ "$status" -eq 0 ]
   grep -qF "# Review standards" "$CLAUDE_ARGS"
 }
@@ -60,18 +58,18 @@ has_arg_pair() {
 # All the protections in review.sh are command-line flags. If someone removes a flag,
 # these tests fail. Thus, a protection cannot disappear without notice.
 @test "Claude has only the Read, Grep and Glob tools" {
-  run bash "$ACTION_DIR/review.sh"
+  run bash "$ACTION_DIR/scripts/review.sh"
   has_arg_pair --tools "Read,Grep,Glob"
 }
 
 @test "the repository's own Claude settings and MCP servers are ignored" {
-  run bash "$ACTION_DIR/review.sh"
+  run bash "$ACTION_DIR/scripts/review.sh"
   has_arg_pair --setting-sources user
   grep -qx -- "--strict-mcp-config" "$CLAUDE_ARGS"
 }
 
 @test "reading is allowed only inside the checkout, with secret locations denied" {
-  run bash "$ACTION_DIR/review.sh"
+  run bash "$ACTION_DIR/scripts/review.sh"
   has_arg_pair --allowedTools "Read(./**),Grep(./**),Glob(./**)"
   for path in "//proc/**" "//sys/**" "//etc/**" "//root/**" "//tmp/**" "//run/**" "//var/**" "~/.*/**"; do
     grep -A1 -x -- "--disallowedTools" "$CLAUDE_ARGS" | grep -qF "Read($path)"
@@ -79,13 +77,13 @@ has_arg_pair() {
 }
 
 @test "the output must match the findings schema" {
-  run bash "$ACTION_DIR/review.sh"
-  has_arg_pair --json-schema "$(jq -c . "$ACTION_DIR/schema.json")"
+  run bash "$ACTION_DIR/scripts/review.sh"
+  has_arg_pair --json-schema "$(jq -c . "$ACTION_DIR/prompt/schema.json")"
 }
 
 @test "an error from Claude fails the review" {
   export CLAUDE_OUTPUT='{"is_error":true,"result":"Something went wrong"}' CLAUDE_EXIT=1
-  run bash "$ACTION_DIR/review.sh"
+  run bash "$ACTION_DIR/scripts/review.sh"
   [ "$status" -eq 1 ]
   [[ "$output" == *"Claude review did not complete"* ]]
   [[ "$output" == *"Something went wrong"* ]]
@@ -93,14 +91,14 @@ has_arg_pair() {
 
 @test "a result without findings (for example, the turn limit was reached) fails the review" {
   export CLAUDE_OUTPUT='{"is_error":false,"subtype":"error_max_turns","result":""}'
-  run bash "$ACTION_DIR/review.sh"
+  run bash "$ACTION_DIR/scripts/review.sh"
   [ "$status" -eq 1 ]
   [[ "$output" == *"Claude review did not complete"* ]]
 }
 
 @test "output that isn't JSON fails the review with a clear message" {
   export CLAUDE_OUTPUT='Credit balance is too low' CLAUDE_EXIT=1
-  run bash "$ACTION_DIR/review.sh"
+  run bash "$ACTION_DIR/scripts/review.sh"
   [ "$status" -eq 1 ]
   [[ "$output" == *"Claude review did not complete"* ]]
   [[ "$output" == *"Credit balance is too low"* ]]
@@ -108,7 +106,7 @@ has_arg_pair() {
 
 @test "no output at all fails the review" {
   export CLAUDE_OUTPUT='' CLAUDE_EXIT=1
-  run bash "$ACTION_DIR/review.sh"
+  run bash "$ACTION_DIR/scripts/review.sh"
   [ "$status" -eq 1 ]
   [[ "$output" == *"Claude review did not complete"* ]]
 }

@@ -28,11 +28,11 @@ if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
 fi
 
 # Compress the schema onto one line, because it is a command-line argument.
-schema=$(jq -c . "$GITHUB_ACTION_PATH/schema.json")
+schema=$(jq -c . "$GITHUB_ACTION_PATH/prompt/schema.json")
 
-prompt="$(cat "$GITHUB_ACTION_PATH/prompt.md")
+prompt="$(cat "$GITHUB_ACTION_PATH/prompt/prompt.md")
 
-$(cat "$GITHUB_ACTION_PATH/standards.md")"
+$(cat "$GITHUB_ACTION_PATH/prompt/standards.md")"
 
 # The limits on Claude. Each limit is a command-line flag below. If you remove one,
 # the tests in tests/review.bats fail.
