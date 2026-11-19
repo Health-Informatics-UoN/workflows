@@ -12,11 +12,13 @@
 #   PR_NUMBER   the PR number
 #   HEAD_SHA    the PR commit that was reviewed; comments are attached to it
 #   GH_TOKEN    token gh uses; needs pull-requests: write
-#   RUNNER_TEMP folder holding review.json from review.sh
+#   RUNNER_TEMP folder holding review.json from review.sh, and threads.json (the PR's
+#               review threads) from fetch-discussed.sh
 # The current directory is the checkout, which holds the diff in .pr-review/pr.diff.
 set -euo pipefail  # Stop on any error, unset variable or failed command in a pipe.
 
 out="$RUNNER_TEMP/review.json"
+threads_file="$RUNNER_TEMP/threads.json"
 diff=".pr-review/pr.diff"
 
 # Hidden markers that identify this action's comments on later runs. They're HTML
@@ -142,44 +144,23 @@ split=$(jq --argjson ok "$commentable" --arg marker "$finding_marker" '
 # instead: a note is added to the top of the bot's own comment, which the token can
 # edit. People then resolve those threads. A finding already marked is skipped.
 # A thread with a reply is a conversation between people, so it's left alone.
-# Checks the first 100 threads, which covers all but very long-running PRs.
 #
-# Review threads are only available through the GraphQL API, not the REST API.
-# The query gets each thread's id, whether it's resolved, how many comments it has,
-# and the first comment's id, text and author type. The --jq filter keeps the open
-# threads with one comment (no replies), started by a bot account with our marker, and
-# not yet marked as superseded, and prints each as one line of JSON. Checking for a bot
-# matters because anyone can copy the marker into a comment of their own; this way a
-# person's comment is never changed.
-# REPO is "owner/name": ${REPO%/*} is the owner and ${REPO#*/} the name.
-#
-# The $ names in the queries are GraphQL variables, not shell ones, so they're in
-# single quotes on purpose (shellcheck would otherwise warn about it).
-# shellcheck disable=SC2016
-threads=$(gh api graphql \
-  -f owner="${REPO%/*}" -f name="${REPO#*/}" -F number="$PR_NUMBER" -f query='
-    query($owner: String!, $name: String!, $number: Int!) {
-      repository(owner: $owner, name: $name) {
-        pullRequest(number: $number) {
-          reviewThreads(first: 100) {
-            nodes {
-              id isResolved
-              comments(first: 1) {
-                totalCount nodes { databaseId body author { __typename } }
-              }
-            }
-          }
-        }
-      }
-    }' \
-  --jq ".data.repository.pullRequest.reviewThreads.nodes[]
-        | select(.isResolved | not)
-        | select(.comments.totalCount == 1)
-        | select(.comments.nodes[0].author.__typename == \"Bot\")
-        | select(.comments.nodes[0].body | contains(\"$finding_marker\"))
-        | select(.comments.nodes[0].body | contains(\"$superseded_marker\") | not)
-        | {id, comment: .comments.nodes[0].databaseId, body: .comments.nodes[0].body}
-        | tojson")
+# The review threads were fetched once by fetch-discussed.sh, before Claude ran, and
+# saved to $RUNNER_TEMP/threads.json. This filter keeps the open threads with one
+# comment (no replies), started by a bot account with our marker, and not yet marked
+# as superseded, and prints each as one line of JSON. Checking for a bot matters
+# because anyone can copy the marker into a comment of their own; this way a person's
+# comment is never changed.
+threads=$(jq -r --arg finding "$finding_marker" --arg superseded "$superseded_marker" '
+  .data.repository.pullRequest.reviewThreads.nodes[]
+  | select(.isResolved | not)
+  | select(.comments.totalCount == 1)
+  | select(.comments.nodes[0].author.__typename == "Bot")
+  | select(.comments.nodes[0].body | contains($finding))
+  | select(.comments.nodes[0].body | contains($superseded) | not)
+  | {id, comment: .comments.nodes[0].databaseId, body: .comments.nodes[0].body}
+  | tojson
+' "$threads_file")
 
 superseded=0
 while IFS= read -r thread; do

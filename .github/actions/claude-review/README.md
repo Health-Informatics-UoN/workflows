@@ -9,7 +9,7 @@ The steps are in [`action.yml`](action.yml). Each one runs a script from this fo
 | Step | Script | What it does |
 |---|---|---|
 | Check PR size | [`check-size.sh`](check-size.sh) | Skips pull requests over `max-lines` changed lines, and comments once to say so. |
-| Fetch PR | [`fetch-pr.sh`](fetch-pr.sh), then [`fetch-discussed.sh`](fetch-discussed.sh) | Saves the PR details, the diff for the exact commits being reviewed, and earlier findings people have replied to, in `.pr-review/` in the checkout. |
+| Fetch PR | [`fetch-pr.sh`](fetch-pr.sh), then [`fetch-discussed.sh`](fetch-discussed.sh) | Saves the PR details, the diff for the exact commits being reviewed, and earlier findings people have replied to, in `.pr-review/` in the checkout. Also saves the PR's review threads to `$RUNNER_TEMP/threads.json`, outside the checkout, for `post.sh`: they're fetched once per run, and Claude can't read them. |
 | Set up Node.js | `actions/setup-node` | Installs Node 24. Claude Code needs Node 22 or later, and the runner image's default changes over time. |
 | Install Claude Code | inline | `npm ci` installs the version pinned in [`package-lock.json`](package-lock.json), checking every package's checksum. |
 | Run Claude review | [`review.sh`](review.sh) | Runs Claude Code read-only with [`prompt.md`](prompt.md) and [`standards.md`](standards.md), and saves its findings. |
@@ -80,7 +80,7 @@ CI runs them on Ubuntu. macOS's own `awk` may behave slightly differently from U
 | `fetch-pr.bats` | Tests for `fetch-pr.sh`: the diff is for the exact commits in the event, and a `.pr-review` folder in the PR is replaced. |
 | `fetch-discussed.bats` | Tests for `fetch-discussed.sh`: which replies are passed to Claude and which are left out, including threads a person started with a copied marker. |
 | `defaults.bats` | Checks that the reusable workflow's input defaults match the action's, and that the limits are 2000 lines and 25 turns. |
-| `test_helper.bash` | Shared setup, and helpers for checking what the fake `gh` was asked to do. |
+| `test_helper.bash` | Shared setup, helpers for checking what the fake `gh` was asked to do, and helpers that build review threads (`thread`, `reply`, `set_threads`, `as_finding`) for the `post.sh` and `fetch-discussed.sh` tests. |
 | `bin/gh`, `bin/claude` | Fakes that stand in for the real programs (see below). |
 | `fixtures/pr.diff` | A sample PR diff (see below). |
 

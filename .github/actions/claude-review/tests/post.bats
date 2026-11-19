@@ -18,6 +18,7 @@ setup() {
   common_setup
   mkdir -p .pr-review
   cp "$BATS_TEST_DIRNAME/fixtures/pr.diff" .pr-review/pr.diff
+  set_threads  # No review threads, unless a test sets some.
 }
 
 # The review posted to GitHub, as JSON.
@@ -99,11 +100,10 @@ posted_summary() {
 }
 
 @test "only this action's open threads from earlier runs are resolved" {
-  export GH_THREADS_JSON='{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
-    {"id":"T_ours_open","isResolved":false,"comments":{"totalCount":1,"nodes":[{"body":"Old\n\n<!-- claude-review-finding -->","author":{"__typename":"Bot"},"databaseId":901}]}},
-    {"id":"T_ours_resolved","isResolved":true,"comments":{"totalCount":1,"nodes":[{"body":"Old\n\n<!-- claude-review-finding -->","author":{"__typename":"Bot"},"databaseId":901}]}},
-    {"id":"T_person","isResolved":false,"comments":{"totalCount":1,"nodes":[{"body":"A reviewer comment","author":{"__typename":"User"}}]}}
-  ]}}}}}'
+  set_threads \
+    "$(thread "$(as_finding Old)" '[]' false Bot T_ours_open)" \
+    "$(thread "$(as_finding Old)" '[]' true Bot T_ours_resolved)" \
+    "$(thread 'A reviewer comment' '[]' false User T_person)"
   write_review '[]'
   run bash "$ACTION_DIR/post.sh"
   [ "$status" -eq 0 ]
@@ -112,9 +112,7 @@ posted_summary() {
 }
 
 @test "a person's thread containing a copied marker isn't resolved" {
-  export GH_THREADS_JSON='{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
-    {"id":"T_forged","isResolved":false,"comments":{"totalCount":1,"nodes":[{"body":"Mine\n\n<!-- claude-review-finding -->","author":{"__typename":"User"}}]}}
-  ]}}}}}'
+  set_threads "$(thread "$(as_finding Mine)" '[]' false User T_forged)"
   write_review '[]'
   run bash "$ACTION_DIR/post.sh"
   [ "$status" -eq 0 ]
@@ -122,10 +120,9 @@ posted_summary() {
 }
 
 @test "a thread from an earlier run that someone has replied to is left open" {
-  export GH_THREADS_JSON='{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
-    {"id":"T_replied","isResolved":false,"comments":{"totalCount":2,"nodes":[{"body":"Old\n\n<!-- claude-review-finding -->","author":{"__typename":"Bot"},"databaseId":901}]}},
-    {"id":"T_no_reply","isResolved":false,"comments":{"totalCount":1,"nodes":[{"body":"Old\n\n<!-- claude-review-finding -->","author":{"__typename":"Bot"},"databaseId":901}]}}
-  ]}}}}}'
+  set_threads \
+    "$(thread "$(as_finding Old)" "[$(reply alice MEMBER 'I disagree')]" false Bot T_replied)" \
+    "$(thread "$(as_finding Old)" '[]' false Bot T_no_reply)"
   write_review '[]'
   run bash "$ACTION_DIR/post.sh"
   [ "$status" -eq 0 ]
@@ -134,9 +131,7 @@ posted_summary() {
 }
 
 @test "earlier threads are resolved before the new review is posted" {
-  export GH_THREADS_JSON='{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
-    {"id":"T_old","isResolved":false,"comments":{"totalCount":1,"nodes":[{"body":"<!-- claude-review-finding -->","author":{"__typename":"Bot"},"databaseId":901}]}}
-  ]}}}}}'
+  set_threads "$(thread "$(as_finding Old)" '[]' false)"
   write_review '[{"path":"app.py","line":2,"body":"New"}]'
   run bash "$ACTION_DIR/post.sh"
   resolve=$(basename "$(calls_with resolveReviewThread)")
@@ -145,9 +140,8 @@ posted_summary() {
 }
 
 @test "a thread the token can't resolve is marked as superseded instead" {
-  export GH_FAIL_RESOLVE=1 GH_THREADS_JSON='{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
-    {"id":"T_old","isResolved":false,"comments":{"totalCount":1,"nodes":[{"body":"Old finding\n\n<!-- claude-review-finding -->","author":{"__typename":"Bot"},"databaseId":901}]}}
-  ]}}}}}'
+  export GH_FAIL_RESOLVE=1
+  set_threads "$(thread "$(as_finding 'Old finding')" '[]' false)"
   write_review '[{"path":"app.py","line":2,"body":"New"}]'
   run bash "$ACTION_DIR/post.sh"
   [ "$status" -eq 0 ]
@@ -155,16 +149,14 @@ posted_summary() {
   edited=$(stdin_of pulls/comments/)
   [[ "$edited" == "**Superseded** by the review of \`abcdef1\`."* ]]
   [[ "$edited" == *"<!-- claude-review-superseded -->"* ]]
-  [[ "$edited" == *$'Old finding\n\n<!-- claude-review-finding -->' ]]
+  [[ "$edited" == *"$(as_finding 'Old finding')" ]]
   [[ "$output" == *"::notice::Marked 1 earlier finding(s) as superseded"* ]]
   [[ "$output" != *"::warning::"* ]]
   [ "$(count_calls /reviews)" -eq 1 ]
 }
 
 @test "a thread that is resolved isn't also marked as superseded" {
-  export GH_THREADS_JSON='{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
-    {"id":"T_old","isResolved":false,"comments":{"totalCount":1,"nodes":[{"body":"<!-- claude-review-finding -->","author":{"__typename":"Bot"},"databaseId":901}]}}
-  ]}}}}}'
+  set_threads "$(thread "$(as_finding Old)" '[]' false)"
   write_review '[]'
   run bash "$ACTION_DIR/post.sh"
   [ "$(count_calls resolveReviewThread)" -eq 1 ]
@@ -172,14 +164,21 @@ posted_summary() {
 }
 
 @test "a finding already marked as superseded is left alone" {
-  export GH_FAIL_RESOLVE=1 GH_THREADS_JSON='{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
-    {"id":"T_old","isResolved":false,"comments":{"totalCount":1,"nodes":[{"body":"**Superseded** by ...\n<!-- claude-review-superseded -->\n\nOld\n\n<!-- claude-review-finding -->","author":{"__typename":"Bot"},"databaseId":901}]}}
-  ]}}}}}'
+  export GH_FAIL_RESOLVE=1
+  marked=$'**Superseded** by ...\n<!-- claude-review-superseded -->\n\n'"$(as_finding Old)"
+  set_threads "$(thread "$marked" '[]' false)"
   write_review '[]'
   run bash "$ACTION_DIR/post.sh"
   [ "$status" -eq 0 ]
   [ "$(count_calls resolveReviewThread)" -eq 0 ]
   [ -z "$(calls_with pulls/comments/)" ]
+}
+
+@test "no GitHub query is made for threads: post.sh reads the saved file" {
+  set_threads "$(thread "$(as_finding Old)" '[]' false)"
+  write_review '[]'
+  run bash "$ACTION_DIR/post.sh"
+  [ -z "$(calls_with reviewThreads)" ]
 }
 
 @test "the first run posts the summary comment, with its marker" {

@@ -44,3 +44,46 @@ write_review() {
     '{is_error: false, structured_output: {findings: $findings, summary: $summary}}' \
     > "$RUNNER_TEMP/review.json"
 }
+
+# --- Review threads, as GitHub's GraphQL API returns them -----------------------------
+
+# One review thread, as JSON.
+#   $1  the first comment's text
+#   $2  replies, as a JSON array of comment nodes (see reply); default none
+#   $3  whether the thread is resolved: true or false; default true
+#   $4  the first comment's author type: "Bot" (as for this action's own findings) or
+#       "User"; default "Bot"
+#   $5  the thread id; default T_1
+# The first comment's id (databaseId) is always 901.
+thread() {
+  jq -n --arg first "$1" --argjson replies "${2:-[]}" --argjson resolved "${3:-true}" \
+    --arg type "${4:-Bot}" --arg id "${5:-T_1}" '{
+    id: $id, isResolved: $resolved, path: "app.py", line: 2, originalLine: 2,
+    comments: {
+      totalCount: (1 + ($replies | length)),
+      nodes: ([{databaseId: 901, body: $first, authorAssociation: "NONE",
+        author: {__typename: $type, login: "github-actions"}}] + $replies)
+    }
+  }'
+}
+
+# One reply, as a JSON comment node. $1: login, $2: authorAssociation, $3: text.
+reply() {
+  jq -n --arg login "$1" --arg association "$2" --arg body "$3" \
+    '{body: $body, authorAssociation: $association, author: {__typename: "User", login: $login}}'
+}
+
+# Sets the PR's review threads, from threads given as arguments (see thread), in both
+# places the scripts get them: the fake gh's answer (GH_THREADS_JSON, used by
+# fetch-discussed.sh) and $RUNNER_TEMP/threads.json (the file fetch-discussed.sh saves
+# and post.sh reads). With no arguments, the PR has no threads.
+set_threads() {
+  GH_THREADS_JSON=$(jq -s '{data: {repository: {pullRequest: {reviewThreads: {nodes: .}}}}}' <<< "$*")
+  export GH_THREADS_JSON
+  printf '%s' "$GH_THREADS_JSON" > "$RUNNER_TEMP/threads.json"
+}
+
+# A finding's text as this action posts it, with the hidden marker. $1: the finding.
+as_finding() {
+  printf '%s\n\n<!-- claude-review-finding -->' "$1"
+}

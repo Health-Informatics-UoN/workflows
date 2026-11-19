@@ -8,30 +8,6 @@ setup() {
   mkdir -p .pr-review
 }
 
-# A review thread, as GitHub's GraphQL API returns it.
-# $1: first comment's body. $2: replies, as JSON comment nodes. $3: isResolved.
-# $4: the first comment's author type, "Bot" (the default, as for this action's own
-# findings) or "User".
-thread() {
-  jq -n --arg first "$1" --argjson replies "${2:-[]}" --argjson resolved "${3:-true}" \
-    --arg type "${4:-Bot}" '{
-    isResolved: $resolved, path: "app.py", line: 2, originalLine: 2,
-    comments: {nodes: ([{body: $first, authorAssociation: "NONE",
-      author: {__typename: $type, login: "github-actions"}}] + $replies)}
-  }'
-}
-
-reply() {
-  jq -n --arg login "$1" --arg association "$2" --arg body "$3" \
-    '{body: $body, authorAssociation: $association, author: {__typename: "User", login: $login}}'
-}
-
-# Sets the fake gh's review threads. Arguments: threads as JSON objects.
-set_threads() {
-  GH_THREADS_JSON=$(jq -s '{data: {repository: {pullRequest: {reviewThreads: {nodes: .}}}}}' <<< "$*")
-  export GH_THREADS_JSON
-}
-
 finding=$'Use a constant here.\n\n<!-- claude-review-finding -->'
 
 @test "a finding someone replied to is listed with the reply" {
@@ -90,6 +66,16 @@ finding=$'Use a constant here.\n\n<!-- claude-review-finding -->'
   set_threads "$outdated"
   run bash "$ACTION_DIR/fetch-discussed.sh"
   [ "$(jq '.[0].line' .pr-review/discussed.json)" -eq 9 ]
+}
+
+@test "GitHub's full answer is saved outside the checkout, for post.sh" {
+  set_threads "$(thread "$finding")"
+  expected=$GH_THREADS_JSON
+  rm "$RUNNER_TEMP/threads.json"
+  run bash "$ACTION_DIR/fetch-discussed.sh"
+  [ "$status" -eq 0 ]
+  [ "$(jq -c . "$RUNNER_TEMP/threads.json")" = "$(jq -c . <<< "$expected")" ]
+  [ ! -e .pr-review/threads.json ]
 }
 
 @test "no threads gives an empty list" {
