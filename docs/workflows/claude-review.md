@@ -35,8 +35,8 @@ Claude reviews against the [general standards](../../.github/actions/claude-revi
 | Input       | Required | Default             | Description                                                              |
 |-------------|----------|---------------------|--------------------------------------------------------------------------|
 | `model`     | No       | `claude-sonnet-5-5` | Claude model to use.                                                     |
-| `max-lines` | No       | `1000`              | Skip pull requests with more changed lines (additions + deletions) than this. |
-| `max-turns` | No       | `15`                | Maximum number of Claude turns per review. Limits cost.                  |
+| `max-lines` | No       | `2000`              | Skip pull requests with more changed lines (additions + deletions) than this. Generated files such as lockfiles count too. |
+| `max-turns` | No       | `25`                | Maximum number of Claude turns per review. Limits cost. Claude spends turns reading files, so if you raise `max-lines`, raise this too; running out of turns fails the review. |
 | `label`     | No       | `claude-review`     | Label that requests a review when added to a pull request.               |
 
 ## Secrets

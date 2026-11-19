@@ -10,7 +10,10 @@ name: Claude PR Review
 on:
   workflow_call:
     inputs:
-      # Defaults match the action's own defaults.
+      # Defaults match the action's own defaults, which
+      # .github/actions/claude-review/tests/defaults.bats checks.
+      # The two limits go together: Claude spends turns reading files, so a larger PR
+      # needs more turns. Running out of turns fails the review.
       model:
         description: Claude model to use.
         type: string
@@ -18,11 +21,11 @@ on:
       max-lines:
         description: Skip PRs with more changed lines (additions + deletions) than this.
         type: number
-        default: 1000
+        default: 2000
       max-turns:
         description: Maximum number of Claude turns per review; limits cost.
         type: number
-        default: 15
+        default: 25
       label:
         description: Label that requests a review when added to a PR.
         type: string

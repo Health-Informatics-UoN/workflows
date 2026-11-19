@@ -76,6 +76,7 @@ CI runs them on Ubuntu. macOS's own `awk` may behave slightly differently from U
 | `review.bats` | Tests for `review.sh`: the arguments passed to Claude, including every security flag, and each kind of failure. |
 | `post.bats` | Tests for `post.sh`: which lines comments attach to, ranges, the summary, resolving earlier threads, and what happens when GitHub rejects a call. |
 | `fetch-discussed.bats` | Tests for `fetch-discussed.sh`: which replies are passed to Claude and which are left out. |
+| `defaults.bats` | Checks that the reusable workflow's input defaults match the action's, and that the limits are 2000 lines and 25 turns. |
 | `test_helper.bash` | Shared setup, and helpers for checking what the fake `gh` was asked to do. |
 | `bin/gh`, `bin/claude` | Fakes that stand in for the real programs (see below). |
 | `fixtures/pr.diff` | A sample PR diff (see below). |

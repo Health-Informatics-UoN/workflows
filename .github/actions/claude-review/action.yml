@@ -18,12 +18,14 @@ inputs:
   model:
     description: Claude model to use.
     default: claude-sonnet-5-5
+  # The two limits go together: Claude spends turns reading files, so a larger PR
+  # needs more turns. Running out of turns fails the review.
   max-turns:
     description: Maximum number of Claude turns per review; limits cost.
-    default: "15"
+    default: "25"
   max-lines:
     description: Skip PRs with more changed lines (additions + deletions) than this.
-    default: "1000"
+    default: "2000"
 
 runs:
   using: composite
