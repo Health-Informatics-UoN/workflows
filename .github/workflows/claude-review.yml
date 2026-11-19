@@ -17,7 +17,7 @@ on:
       model:
         description: Claude model to use.
         type: string
-        default: claude-sonnet-5-5
+        default: claude-opus-5-5
       max-lines:
         description: Skip PRs with more changed lines (additions + deletions) than this.
         type: number

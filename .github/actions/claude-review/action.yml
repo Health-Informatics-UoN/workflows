@@ -17,7 +17,7 @@ inputs:
     default: ${{ github.token }}
   model:
     description: Claude model to use.
-    default: claude-sonnet-5-5
+    default: claude-opus-5-5
   # The two limits go together: Claude spends turns reading files, so a larger PR
   # needs more turns. Running out of turns fails the review.
   max-turns:
