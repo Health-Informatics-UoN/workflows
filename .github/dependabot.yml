@@ -33,7 +33,7 @@ updates:
     directory: "/.github/actions/claude-review"
     schedule:
       interval: "monthly"
-2    # Wait one week before Dependabot proposes a new release. Thus, if a release is
+    # Wait one week before Dependabot proposes a new release. Thus, if a release is
     # compromised and quickly removed, the release never gets to this repo.
     cooldown:
       default-days: 7
