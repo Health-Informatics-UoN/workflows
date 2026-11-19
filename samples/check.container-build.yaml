@@ -1,0 +1,31 @@
+# Sample workflow for building a container image on every pull request using reusable workflows from health-informatics-uon/workflows
+# Pull requests from branches in your repo publish images tagged `pr-<number>`, `sha-<commit>` and `tree-<hash>`, so they can be tested before merging
+# Pull requests from forks and Dependabot can't publish, so they only check the image builds
+# Customize the placeholders and values below for your specific project
+
+name: Check Container Builds
+
+on:
+  pull_request:
+
+# A new push to the PR cancels the build of the previous one
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    permissions:
+      contents: read
+      packages: write
+    uses: health-informatics-uon/workflows/.github/workflows/publish-pr-container.yml@<NEW_SHA> # <NEW_VERSION>
+    with:
+      # Your container image name (must match the one in your release workflow)
+      image-name: <YOUR_IMAGE_NAME>
+      image-description: "<YOUR_IMAGE_DESCRIPTION> (pull request build)"
+      # Target platforms (use the same as your release workflow)
+      platforms: linux/amd64,linux/arm64
+      # Uncomment to only check pull requests build, without publishing images
+      # (and `packages: write` above can then be removed)
+      # publish: false
+    secrets: inherit
