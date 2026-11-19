@@ -19,6 +19,14 @@ set -euo pipefail  # Stop on any error, unset variable or failed command in a pi
 
 out="$RUNNER_TEMP/review.json"
 
+# GitHub passes an empty string, not an error, when the caller's secret doesn't exist,
+# even though the workflow marks it as required. Claude Code then only says "Not logged
+# in", so check here and say what's actually wrong.
+if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+  echo "::error::ANTHROPIC_API_KEY is empty. Add it as an Actions secret (Settings > Secrets and variables > Actions) and pass it to the workflow under secrets:."
+  exit 1
+fi
+
 # The JSON schema Claude's answer must follow (findings + summary), squashed onto one
 # line to pass as an argument.
 schema=$(jq -c . "$GITHUB_ACTION_PATH/schema.json")

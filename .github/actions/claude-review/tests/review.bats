@@ -14,13 +14,28 @@ setup() {
   done
   ln -s "$BATS_TEST_DIRNAME/bin/claude" "$GITHUB_ACTION_PATH/node_modules/.bin/claude"
   export CLAUDE_ARGS="$BATS_TEST_TMPDIR/claude-args"
-  export MODEL="claude-test-model" MAX_TURNS="7"
+  export MODEL="claude-test-model" MAX_TURNS="7" ANTHROPIC_API_KEY="test-key"
   export CLAUDE_OUTPUT='{"is_error":false,"num_turns":3,"structured_output":{"findings":[],"summary":"No findings."}}'
 }
 
 # True if the fake claude was given argument $1 followed by $2.
 has_arg_pair() {
   awk -v a="$1" -v b="$2" 'prev == a && $0 == b { found = 1 } { prev = $0 } END { exit !found }' "$CLAUDE_ARGS"
+}
+
+@test "an empty API key fails with a clear message, without running Claude" {
+  export ANTHROPIC_API_KEY=""
+  run bash "$ACTION_DIR/review.sh"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"ANTHROPIC_API_KEY is empty"* ]]
+  [ ! -e "$CLAUDE_ARGS" ]
+}
+
+@test "a missing API key fails with a clear message" {
+  unset ANTHROPIC_API_KEY
+  run bash "$ACTION_DIR/review.sh"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"ANTHROPIC_API_KEY is empty"* ]]
 }
 
 @test "a completed review passes and keeps Claude's output" {
