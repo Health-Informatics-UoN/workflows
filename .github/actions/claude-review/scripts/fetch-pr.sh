@@ -3,18 +3,15 @@
 #   pr.json  the title, description, author and branch names
 #   pr.diff  the changes, for the exact commits that this run reviews
 #
-# This script gets the PR before Claude starts. Thus, the Claude step does not need a
-# GitHub token. The script does not get the PR comments. Any person can post them, so
-# they can contain injected instructions. (fetch-discussed.sh gets the trusted replies
-# to earlier findings.)
+# The script gets the PR before Claude starts, so the Claude step needs no GitHub token.
+# It does not get the PR comments: any person can post them, so they can contain
+# injected instructions. (fetch-discussed.sh gets the trusted replies to old findings.)
 #
-# The diff is for BASE_SHA...HEAD_SHA. These are the commits in the event that started
-# this run. The diff is not for the current state of the PR. The checkout and post.sh
-# also use HEAD_SHA. Thus, these three items are the same commit: the code that Claude
-# reads, the diff that its line numbers refer to, and the commit that gets the comments.
-# This is true also if a person pushes during the review. (The three dots compare
-# HEAD_SHA with the point where it branched from BASE_SHA. GitHub shows the same diff on
-# the PR.)
+# The diff is for BASE_SHA...HEAD_SHA, the commits in the event that started this run,
+# not the current state of the PR. The checkout and post.sh also use HEAD_SHA. Thus, the
+# code that Claude reads, the diff that its line numbers refer to, and the commit that
+# gets the comments are the same, also if a person pushes during the review. (The three
+# dots compare HEAD_SHA with the point where it branched from BASE_SHA, as on the PR.)
 #
 # Environment (set by action.yml):
 #   REPO        owner/name of the repository, for example org/repo
@@ -29,8 +26,7 @@ set -euo pipefail
 rm -rf .pr-review
 mkdir .pr-review
 
-# Do not include the list of changed files. That list is for the current state of the
-# PR. Also, the diff shows the files.
+# No list of changed files: it is for the current PR state. The diff shows the files.
 gh pr view "$PR_NUMBER" --repo "$REPO" \
   --json title,body,author,baseRefName,headRefName > .pr-review/pr.json
 

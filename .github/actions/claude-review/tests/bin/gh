@@ -24,9 +24,13 @@ respond() {
 }
 
 no_threads='{"data":{"repository":{"pullRequest":{"reviewThreads":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}}}}}'
+thread_now='{"data":{"node":{"isResolved":false,"comments":{"totalCount":1}}}}'
 no_pr='{"title":"","body":""}'
 
 case " $* " in
+  *PullRequestReviewThread*)
+    # The state of one thread now. GH_THREAD_NOW_JSON, if set, is a different state.
+    respond "${GH_THREAD_NOW_JSON:-$thread_now}" ;;
   *resolveReviewThread*)
     [ -z "${GH_FAIL_RESOLVE:-}" ] || exit 1
     respond '{}' ;;

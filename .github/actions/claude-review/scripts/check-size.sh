@@ -2,10 +2,9 @@
 # Finds if the PR is small enough to review, and gives the result to the later steps.
 #
 # Sets the step output `too-large` to "true" or "false". The other steps in action.yml
-# run only if it is "false". Large PRs cost more to review and get worse reviews.
-# Thus, this action does not review them. If the PR is too large, the action posts one
-# comment on the PR that gives the reason. A hidden marker in that comment stops
-# the action from posting it again on each push.
+# run only if it is "false". Large PRs cost more to review and get worse reviews, so
+# this action does not review them. It posts one comment that gives the reason. A hidden
+# marker in that comment stops the action from posting it again on each push.
 #
 # Environment (set by action.yml):
 #   ADDITIONS, DELETIONS  the lines that the PR adds and removes, from the GitHub event
@@ -16,7 +15,6 @@
 #   GITHUB_OUTPUT         the file from which GitHub Actions reads the step outputs
 set -euo pipefail
 
-# GitHub counts changed lines as additions + deletions.
 lines=$((ADDITIONS + DELETIONS))
 
 if [ "$lines" -le "$MAX_LINES" ]; then
@@ -28,8 +26,7 @@ echo "too-large=true" >> "$GITHUB_OUTPUT"
 # GitHub does not show an HTML comment, but the next run finds it in the comment text.
 marker="<!-- claude-review-too-large -->"
 
-# Only comments from a bot account count. If not, a person can copy the marker into a
-# comment and stop the notice.
+# Only bot comments count. If not, a person can copy the marker and stop the notice.
 comments=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
   --jq '.[] | select(.user.type == "Bot") | .body')
 

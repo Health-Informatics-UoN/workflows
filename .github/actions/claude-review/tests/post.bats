@@ -174,11 +174,31 @@ posted_summary() {
   [ -z "$(calls_with pulls/comments/)" ]
 }
 
-@test "no GitHub query is made for threads: post.sh reads the saved file" {
+@test "post.sh reads the thread list from the saved file, and checks each thread again" {
   set_threads "$(thread "$(as_finding Old)" '[]' false)"
   write_review '[]'
   run bash "$ACTION_DIR/scripts/post.sh"
   [ -z "$(calls_with reviewThreads)" ]
+  [ "$(count_calls PullRequestReviewThread)" -eq 1 ]
+}
+
+@test "a thread that gets a reply during the review is not changed" {
+  export GH_FAIL_RESOLVE=1
+  export GH_THREAD_NOW_JSON='{"data":{"node":{"isResolved":false,"comments":{"totalCount":2}}}}'
+  set_threads "$(thread "$(as_finding Old)" '[]' false)"
+  write_review '[]'
+  run bash "$ACTION_DIR/scripts/post.sh"
+  [ "$status" -eq 0 ]
+  [ "$(count_calls resolveReviewThread)" -eq 0 ]
+  [ -z "$(calls_with pulls/comments/)" ]
+}
+
+@test "a thread that a person resolves during the review is not changed" {
+  export GH_THREAD_NOW_JSON='{"data":{"node":{"isResolved":true,"comments":{"totalCount":1}}}}'
+  set_threads "$(thread "$(as_finding Old)" '[]' false)"
+  write_review '[]'
+  run bash "$ACTION_DIR/scripts/post.sh"
+  [ "$(count_calls resolveReviewThread)" -eq 0 ]
 }
 
 @test "the first run posts the summary comment, with its marker" {

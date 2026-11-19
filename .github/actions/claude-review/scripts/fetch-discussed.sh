@@ -11,11 +11,10 @@
 #                              person. Claude must not read these comments.
 #   .pr-review/discussed.json  the filtered list below, in the checkout for Claude.
 #
-# This file includes only replies from persons with access to the repository (owners,
-# organisation members and collaborators). Any person can comment on a public PR, so
-# other replies can contain injected instructions. For the same reason, a thread is an
-# earlier finding only if a bot account posted its first comment. The marker alone is
-# not sufficient, because any person can copy the marker into a comment.
+# Only replies from persons with access to the repository (owners, organisation members
+# and collaborators) are included. Any person can comment on a public PR, so other
+# replies can contain injected instructions. For the same reason, a thread is an earlier
+# finding only if a bot posted its first comment. Any person can copy the marker.
 #
 # Environment (set by action.yml):
 #   REPO         owner/name of the repository, for example org/repo
@@ -39,17 +38,14 @@ superseded_marker="<!-- claude-review-superseded -->"
 
 # Review threads are available only through the GraphQL API, not the REST API.
 # post.sh uses the thread id and isResolved to resolve or mark old findings, and the
-# comment databaseId to edit them. "line" is null if the code changed after the
-# comment (the thread is outdated). Then "originalLine" is the line of the first post.
-# GitHub gives a maximum of 100 threads on each page. With --paginate, gh gets all the
-# pages: it gives $endCursor (the position after the last page) to the next request,
-# until hasNextPage is false. gh prints one JSON answer for each page. jq -s reads all
-# the answers and joins their threads into one list.
+# comment databaseId to edit them. "line" is null if the thread is outdated (the code
+# changed). Then "originalLine" is the line of the first post.
+# With --paginate, gh gets all the pages of 100 threads: it gives $endCursor to the next
+# request until hasNextPage is false. jq -s joins the threads of all pages in one list.
 # The query gets a maximum of 20 comments for each thread. totalCount is always the
 # full number, so the check for "no replies" in post.sh is always correct.
 # REPO is "owner/name": ${REPO%/*} is the owner and ${REPO#*/} is the name.
-# The $ names in the query are GraphQL variables, not shell variables. Thus, the
-# single quotes are on purpose.
+# The $ names in the query are GraphQL variables, so the single quotes are on purpose.
 # shellcheck disable=SC2016
 gh api graphql --paginate \
   -f owner="${REPO%/*}" -f name="${REPO#*/}" -F number="$PR_NUMBER" -f query='
@@ -80,8 +76,7 @@ jq --arg marker "$marker" --arg superseded "$superseded_marker" '
           # If the thread is outdated, use the original line.
           line: (.line // .originalLine),
           resolved: .isResolved,
-          # The finding text, without the marker.
-          # If post.sh marked the finding as superseded, remove the note at the top.
+          # The finding text, without the marker and without a superseded note.
           finding: (.comments.nodes[0].body
             | split($superseded + "\n\n") | last
             | split("\n\n" + $marker)[0]),

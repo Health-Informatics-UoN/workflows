@@ -72,25 +72,22 @@ reply() {
     '{body: $body, authorAssociation: $association, author: {__typename: "User", login: $login}}'
 }
 
-# Shows one page of review threads, as the GitHub GraphQL API gives it. The arguments
-# are threads (see thread). The page is the last page.
+# Shows the last page of review threads from the GraphQL API. Arguments: see thread.
 threads_page() {
   jq -s '{data: {repository: {pullRequest: {reviewThreads: {
     pageInfo: {hasNextPage: false, endCursor: null}, nodes: .}}}}}' <<< "$*"
 }
 
-# Sets the review threads of the PR (see thread). With no arguments, the PR has no
-# threads. It writes the threads to GH_THREADS_JSON (the answer of the fake gh, for
-# fetch-discussed.sh) and to $RUNNER_TEMP/threads.json (the list that
-# fetch-discussed.sh saves and post.sh reads).
+# Sets the review threads of the PR (see thread). No arguments means no threads. Writes
+# them to GH_THREADS_JSON (the fake gh answer, for fetch-discussed.sh) and to
+# $RUNNER_TEMP/threads.json (the list that fetch-discussed.sh saves and post.sh reads).
 set_threads() {
   GH_THREADS_JSON=$(threads_page "$@")
   export GH_THREADS_JSON
   jq -s '.' <<< "$*" > "$RUNNER_TEMP/threads.json"
 }
 
-# Shows the text of a finding as this action posts it, with the hidden marker.
-# $1: the finding.
+# Shows the text of finding $1 as this action posts it, with the hidden marker.
 as_finding() {
   printf '%s\n\n<!-- claude-review-finding -->' "$1"
 }

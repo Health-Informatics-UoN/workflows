@@ -2,10 +2,9 @@
 # samples/check.claude-review.yaml). Give ANTHROPIC_API_KEY explicitly.
 #
 # The workflow does a review when a PR opens, gets new commits or becomes ready for
-# review. It also does a review when someone adds the review label (by default
-# `claude-review`). The label requests a review at any time, also on a draft PR. The
-# workflow removes the label after the review, so that you can add it again. For this
-# function, the trigger of the caller must include the `labeled` type.
+# review, or when a person adds the review label (default `claude-review`). The label
+# requests a review at any time, also on a draft PR. It is removed after the review, so
+# that you can add it again. The caller trigger must include the `labeled` type.
 name: Claude PR Review
 
 on:
@@ -45,8 +44,7 @@ permissions: {}
 jobs:
   review:
     # Skip forks and Dependabot, because they have no secrets. The Dependabot check uses
-    # the PR author, not github.actor. Thus, if a person runs the job again, the job
-    # is still skipped. The header above gives the label and draft rules.
+    # the PR author, not github.actor, so the job is still skipped if it runs again.
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.user.login != 'dependabot[bot]' &&
@@ -76,9 +74,9 @@ jobs:
           persist-credentials: false
 
       # $/ is the repository of this workflow, at the commit that runs. Thus, the action
-      # is always the same version as the workflow that the caller pinned.
-      # Real runs confirm this. The log shows "Run <this repo>/.github/actions/
-      # claude-review@<commit>", with the same commit as the workflow.
+      # is always the same version as the workflow that the caller pinned. Real runs
+      # confirm this: the log shows "Run <repo>/.github/actions/claude-review@<commit>",
+      # with the same commit as the workflow.
       - name: Claude review
         uses: $/.github/actions/claude-review
         with:
@@ -88,8 +86,7 @@ jobs:
           max-turns: ${{ inputs.max-turns }}
           effort: ${{ inputs.effort }}
 
-      # Remove the review label, also if the review failed. Then, if someone adds the
-      # label again, the label requests another review.
+      # Remove the label also if the review failed. Then a new label requests a review.
       - name: Remove review label
         if: always() && github.event.action == 'labeled'
         env:
