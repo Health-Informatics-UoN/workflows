@@ -2,7 +2,8 @@ name: Claude PR Review (self)
 
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review]
+    # labeled: adding the claude-review label requests a review.
+    types: [opened, synchronize, ready_for_review, labeled]
 
 permissions: {}
 

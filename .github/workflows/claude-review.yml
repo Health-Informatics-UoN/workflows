@@ -1,5 +1,10 @@
 # Reusable Claude PR review. Call it from a pull_request workflow (see
-# check.claude-review.yml) and pass ANTHROPIC_API_KEY explicitly.
+# samples/check.claude-review.yaml) and pass ANTHROPIC_API_KEY explicitly.
+#
+# It reviews when a PR is opened, gets new commits or is marked ready for review, and
+# when someone adds the review label (by default `claude-review`), which requests a
+# review at any time, including on a draft. The label is removed afterwards, so it can
+# be added again. The caller's trigger must include the `labeled` type for this.
 name: Claude PR Review
 
 on:
@@ -14,18 +19,34 @@ on:
         description: Skip PRs with more changed lines (additions + deletions) than this.
         type: number
         default: 1000
+      max-turns:
+        description: Maximum number of Claude turns per review; limits cost.
+        type: number
+        default: 15
+      label:
+        description: Label that requests a review when added to a PR.
+        type: string
+        default: claude-review
     secrets:
       ANTHROPIC_API_KEY:
         description: Claude Console API key.
         required: true
 
+permissions: {}
+
 jobs:
   review:
-    # Skip drafts, forks (no secrets) and Dependabot (no secrets)
+    # Skip forks (no secrets) and Dependabot (no secrets). Dependabot is checked by who
+    # opened the PR, not github.actor, so a person re-running the job is still skipped.
+    # When a label is added, review only if it's the review label; it overrides the
+    # draft check, because someone asked for the review. Otherwise skip drafts.
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
-      !github.event.pull_request.draft &&
-      github.actor != 'dependabot[bot]'
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      (github.event.action == 'labeled'
+        && github.event.label.name == inputs.label
+        || github.event.action != 'labeled'
+        && !github.event.pull_request.draft)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -40,6 +61,10 @@ jobs:
       - name: Checkout PR code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # The PR's own commit, not GitHub's test merge with the base branch, so Claude
+          # reads the same code as the diff its line numbers refer to. The test merge also
+          # doesn't exist when the PR has conflicts, which would fail the checkout.
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
           # Don't leave the GitHub token in .git/config, where Claude could read it.
           persist-credentials: false
@@ -52,3 +77,17 @@ jobs:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
           model: ${{ inputs.model }}
           max-lines: ${{ inputs.max-lines }}
+          max-turns: ${{ inputs.max-turns }}
+
+      # Remove the review label, even if the review failed, so adding it again
+      # requests another review.
+      - name: Remove review label
+        if: always() && github.event.action == 'labeled'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          LABEL: ${{ inputs.label }}
+        run: |
+          gh pr edit "$PR_NUMBER" --repo "$REPO" --remove-label "$LABEL" \
+            || echo "::warning::Could not remove the $LABEL label"

@@ -41,6 +41,8 @@ runs:
 
     # Fetched here so the Claude step has no GitHub token and no shell. Comments
     # aren't fetched: anyone can post them, so they could carry injected instructions.
+    # The exception is replies to earlier findings from people with access to the
+    # repository (see fetch-discussed.sh).
     - name: Fetch PR
       if: steps.size.outputs.too-large == 'false'
       shell: bash
@@ -54,6 +56,7 @@ runs:
         gh pr view "$PR_NUMBER" --repo "$REPO" \
           --json title,body,author,baseRefName,headRefName,files > .pr-review/pr.json
         gh pr diff "$PR_NUMBER" --repo "$REPO" > .pr-review/pr.diff
+        bash "$GITHUB_ACTION_PATH/fetch-discussed.sh"
 
     # Installs the Claude Code version pinned in package-lock.json, checking every
     # package against its recorded checksum. Dependabot proposes updates.

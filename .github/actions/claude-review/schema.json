@@ -8,6 +8,7 @@
         "properties": {
           "path": { "type": "string" },
           "line": { "type": "integer" },
+          "start_line": { "type": "integer" },
           "body": { "type": "string" }
         },
         "required": ["path", "line", "body"]
