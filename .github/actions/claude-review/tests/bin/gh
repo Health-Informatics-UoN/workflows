@@ -6,10 +6,10 @@
 # in the scripts.
 set -euo pipefail
 
-n=$(printf '%03d' $(( $(find "$GH_CALLS" -name '*.args' | wc -l) + 1 )))
-printf '%s\n' "$@" > "$GH_CALLS/$n.args"
+call_number=$(printf '%03d' $(( $(find "$GH_CALLS" -name '*.args' | wc -l) + 1 )))
+printf '%s\n' "$@" > "$GH_CALLS/$call_number.args"
 case " $* " in
-  *"=@-"*|*" --input - "*|*" --body-file - "*) cat > "$GH_CALLS/$n.stdin" ;;
+  *"=@-"*|*" --input - "*|*" --body-file - "*) cat > "$GH_CALLS/$call_number.stdin" ;;
 esac
 
 filter=""

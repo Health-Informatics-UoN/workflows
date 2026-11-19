@@ -65,22 +65,26 @@ commentable=$(LC_ALL=C awk '
   # removes the quotes and changes each backslash code into its character: \NNN (an
   # octal byte value), \t (TAB), \n (new line). A backslash followed by a different
   # character becomes that character.
-  function unquote(s,    out, i, c, next_c) {
-    s = substr(s, 2, length(s) - 2)
-    out = ""
-    for (i = 1; i <= length(s); i++) {
-      c = substr(s, i, 1)
-      if (c != "\\") { out = out c; continue }
-      next_c = substr(s, i + 1, 1)
-      if (next_c ~ /[0-7]/) {
-        out = out sprintf("%c", substr(s, i + 1, 1) * 64 + substr(s, i + 2, 1) * 8 + substr(s, i + 3, 1))
-        i += 3
+  # The names after the extra spaces are local variables, as is usual in awk.
+  function unquote(quoted,    name, pos, char, next_char, code) {
+    quoted = substr(quoted, 2, length(quoted) - 2)
+    name = ""
+    for (pos = 1; pos <= length(quoted); pos++) {
+      char = substr(quoted, pos, 1)
+      if (char != "\\") { name = name char; continue }
+      next_char = substr(quoted, pos + 1, 1)
+      if (next_char ~ /[0-7]/) {
+        # Three octal digits give the value of one byte.
+        code = substr(quoted, pos + 1, 1) * 64 + substr(quoted, pos + 2, 1) * 8 \
+          + substr(quoted, pos + 3, 1)
+        name = name sprintf("%c", code)
+        pos += 3
       } else {
-        out = out (next_c == "t" ? "\t" : next_c == "n" ? "\n" : next_c)
-        i++
+        name = name (next_char == "t" ? "\t" : next_char == "n" ? "\n" : next_char)
+        pos++
       }
     }
-    return out
+    return name
   }
 
   # A new file starts: wait for its header.
@@ -107,7 +111,7 @@ commentable=$(LC_ALL=C awk '
   # Context lines (space) and added lines (+) are in the new file. Removed lines (-)
   # are not, so the program does not count them.
   in_hunk && file != "" && /^[ +]/ { print file "\t" line "\t" hunk; line++ }
-' "$diff" | jq -Rn 'reduce (inputs | split("\t")) as [$p, $l, $h] ({}; .[$p][$l] = $h)')
+' "$diff" | jq -Rn 'reduce (inputs | split("\t")) as [$path, $line, $hunk] ({}; .[$path][$line] = $hunk)')
 
 # --- Sort the findings ----------------------------------------------------------------
 #
@@ -118,16 +122,16 @@ commentable=$(LC_ALL=C awk '
 # the correct order and in one hunk. If not, the script removes the start_line and puts
 # the comment on the last line only.
 # "side": "RIGHT" means the new version of the file, not the old version.
-split=$(jq --argjson ok "$commentable" --arg marker "$finding_marker" '
+split=$(jq --argjson commentable "$commentable" --arg marker "$finding_marker" '
   # The hunk that contains a line, or null if the line is not in the diff.
-  def hunk($p; $l): $ok[$p][($l | tostring)];
+  def hunk_of($path; $line): $commentable[$path][($line | tostring)];
 
   .structured_output.findings
-  | map(. as $f | hunk($f.path; $f.line) as $h
-      | if $h == null then {unanchored: $f}
+  | map(. as $finding | hunk_of($finding.path; $finding.line) as $hunk
+      | if $hunk == null then {unanchored: $finding}
         else {comment: ({path, line, side: "RIGHT", body: (.body + "\n\n" + $marker)}
           + (if .start_line != null and .start_line < .line
-                and hunk($f.path; $f.start_line) == $h
+                and hunk_of($finding.path; $finding.start_line) == $hunk
              then {start_line, start_side: "RIGHT"} else {} end))}
         end)
   | {comments: map(.comment // empty), unanchored: map(.unanchored // empty)}
