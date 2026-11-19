@@ -3,8 +3,8 @@
 #
 # Sets the step output `too-large` to "true" or "false". The other steps in action.yml
 # run only if it is "false". Large PRs cost more to review and get worse reviews.
-# Thus, this action does not review them. If the action does not review a PR, it posts
-# one comment on the PR that gives the reason. A hidden marker in that comment stops
+# Thus, this action does not review them. If the PR is too large, the action posts one
+# comment on the PR that gives the reason. A hidden marker in that comment stops
 # the action from posting it again on each push.
 #
 # Environment (set by action.yml):

@@ -2,13 +2,14 @@ name: Claude PR review
 description: >-
   Reviews a pull request with Claude Code, read-only, and posts the findings as
   inline comments plus a summary comment. Run it on pull_request events, after
-  checking out the PR.
+  checking out the PR head commit (ref: github.event.pull_request.head.sha) with
+  persist-credentials: false, because Claude can read .git/config.
 
 inputs:
   anthropic-api-key:
     description: >-
-      Claude Console API key. The API credits included with Claude Team and Max
-      plans cover this (`claude -p` run with an API key is billed as Agent SDK
+      Claude Console API key. The monthly API credits of Claude Max, Ultra and Team
+      plans (not Enterprise) cover this (`claude -p` run with an API key is billed as Agent SDK
       usage); they don't cover anthropics/claude-code-action, which is why this
       action runs the CLI directly. https://support.claude.com/en/articles/17154008
     required: true
@@ -18,14 +19,17 @@ inputs:
   model:
     description: Claude model to use.
     default: claude-opus-5-5
-  # The two limits are related. Claude uses turns to read files, so a larger PR needs
-  # more turns. If Claude uses all turns, the review fails.
+  # max-turns and max-lines are related. Claude uses turns to read files, so a larger
+  # PR needs more turns. If Claude uses all turns, the review fails.
   max-turns:
     description: Maximum number of Claude turns per review; limits cost.
     default: "25"
   max-lines:
     description: Skip PRs with more changed lines (additions + deletions) than this.
     default: "2000"
+  effort:
+    description: How much Claude thinks (low, medium, high, xhigh or max). Higher finds more, and costs more.
+    default: high
 
 runs:
   using: composite
@@ -81,6 +85,7 @@ runs:
         ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
         MODEL: ${{ inputs.model }}
         MAX_TURNS: ${{ inputs.max-turns }}
+        EFFORT: ${{ inputs.effort }}
       run: bash "$GITHUB_ACTION_PATH/scripts/review.sh"
 
     - name: Post review comments

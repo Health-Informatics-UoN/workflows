@@ -25,7 +25,7 @@ count_calls() {
 }
 
 # Shows the gh calls that have an argument that is exactly $1. For example, "comment"
-# finds "gh pr comment", but not "comments" in "gh pr view --json comments".
+# finds "gh pr comment", but not "repos/org/repo/issues/7/comments".
 calls_with_arg() {
   grep -lxF -- "$1" "$GH_CALLS"/*.args 2>/dev/null || true
 }

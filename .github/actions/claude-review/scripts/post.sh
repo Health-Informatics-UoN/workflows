@@ -2,8 +2,9 @@
 # This script posts the findings in $RUNNER_TEMP/review.json to the PR:
 #   1. It processes the findings from earlier runs that have no replies. If the token
 #      has permission, it resolves them. If not, it marks them as superseded.
-#   2. It posts the findings as one review, so each run makes one notification.
-#   3. It posts a new summary comment at the bottom of the PR and deletes the old one.
+#   2. It posts the findings as one review, so all findings make one notification.
+#   3. It posts a new summary comment at the bottom of the PR and deletes the earlier
+#      summaries.
 # GitHub does not attach a finding to a line that is not in the diff. The summary shows
 # these findings, so no finding is lost.
 #
@@ -56,7 +57,8 @@ superseded_marker="<!-- claude-review-superseded -->"
 #   - If a name has a space, Git adds a TAB at the end:  +++ b/my notes.txt<TAB>
 #   - If a name has other unusual characters, Git puts it in quotes and writes those
 #     characters as backslash codes:  +++ "b/caf\303\251.py"  for café.py
-# The awk program reverses the two changes, so the name is the same as the Claude name.
+# The awk program reverses the two changes, so the name is the same as the path in the
+# findings.
 # LC_ALL=C makes awk use bytes, so the codes become the correct bytes in all awk types.
 #
 # Then jq changes these lines into one JSON object: {"path": {"line": hunk number}},
@@ -154,6 +156,8 @@ split=$(jq --slurpfile commentable "$commentable_file" --arg marker "$finding_ma
 # The filter keeps the open threads without replies that a bot started with our marker
 # and that do not have the superseded mark. The bot check is important, because anyone
 # can copy the marker into their own comment.
+# threads.json is from before the review. A reply that a person posts during the
+# review is not in it.
 threads=$(jq -r --arg finding "$finding_marker" --arg superseded "$superseded_marker" '
   .[]
   | select(.isResolved | not)
@@ -232,7 +236,8 @@ previous=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
   --jq ".[] | select(.user.type == \"Bot\" and (.body | contains(\"$summary_marker\"))) | .id")
 
 # Post the new summary first. Then, if a step fails, the PR always has a summary.
-# The script sends the body on stdin ("-"), so the shell never runs its text as code.
+# The script sends the body on stdin ("-"), not as an argument. A long summary can be
+# larger than the Linux limit of 128 KiB for one argument.
 printf '%s' "$body" | gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file -
 
 for id in $previous; do

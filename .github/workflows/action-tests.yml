@@ -1,4 +1,4 @@
-# This workflow runs the unit tests for the composite actions in .github/actions. It is
+# This workflow runs the unit tests for the Claude review action. It is
 # a self-check, not a reusable workflow. The tests use fake gh and claude commands, so
 # they need no secrets.
 name: Action Tests

@@ -11,10 +11,10 @@ name: Claude PR Review
 on:
   workflow_call:
     inputs:
-      # These defaults are the same as the defaults of the action.
-      # .github/actions/claude-review/tests/defaults.bats checks this.
-      # The two limits are related. Claude uses turns to read files, so a larger PR
-      # needs more turns. If Claude uses all its turns, the review fails.
+      # The defaults of model, max-lines, max-turns and effort are the same as in the
+      # action. .github/actions/claude-review/tests/defaults.bats checks this.
+      # max-turns and max-lines are related. Claude uses turns to read files, so a
+      # larger PR needs more turns. If Claude uses all its turns, the review fails.
       model:
         description: Claude model to use.
         type: string
@@ -27,6 +27,10 @@ on:
         description: Maximum number of Claude turns per review; limits cost.
         type: number
         default: 25
+      effort:
+        description: How much Claude thinks (low, medium, high, xhigh or max). Higher finds more, and costs more.
+        type: string
+        default: high
       label:
         description: Label that requests a review when added to a PR.
         type: string
@@ -82,6 +86,7 @@ jobs:
           model: ${{ inputs.model }}
           max-lines: ${{ inputs.max-lines }}
           max-turns: ${{ inputs.max-turns }}
+          effort: ${{ inputs.effort }}
 
       # Remove the review label, also if the review failed. Then, if someone adds the
       # label again, the label requests another review.

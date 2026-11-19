@@ -12,7 +12,7 @@
 #
 # Environment (set by action.yml):
 #   ANTHROPIC_API_KEY   the key that Claude Code uses to call the Claude API
-#   MODEL, MAX_TURNS    from the action inputs
+#   MODEL, MAX_TURNS, EFFORT  from the action inputs
 #   GITHUB_ACTION_PATH  the action folder: prompt, standards, schema and Claude Code
 #   RUNNER_TEMP         a temporary folder outside the checkout. Claude cannot read it.
 set -euo pipefail
@@ -27,7 +27,7 @@ if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
   exit 1
 fi
 
-# Compress the schema onto one line, because it is a command-line argument.
+# jq -c puts the schema on one line, and also checks that schema.json is valid JSON.
 schema=$(jq -c . "$GITHUB_ACTION_PATH/prompt/schema.json")
 
 prompt="$(cat "$GITHUB_ACTION_PATH/prompt/prompt.md")
@@ -54,6 +54,7 @@ $(cat "$GITHUB_ACTION_PATH/prompt/standards.md")"
 allow="Read(./**),Grep(./**),Glob(./**)"
 # The "~" is for Claude Code, not for the shell, so the shell must not expand it.
 # shellcheck disable=SC2088
+# RUNNER_TEMP starts with /, so "/${RUNNER_TEMP}" starts with // (an absolute path).
 denied_paths=("//proc/**" "//sys/**" "//etc/**" "//root/**" "//tmp/**" "//run/**" \
   "//var/**" "~/.*/**" "/${RUNNER_TEMP}/**")
 deny=""
@@ -70,6 +71,7 @@ deny=${deny%,}  # Remove the last comma.
 "$GITHUB_ACTION_PATH/node_modules/.bin/claude" -p "$prompt" \
   --model "$MODEL" \
   --max-turns "$MAX_TURNS" \
+  --effort "$EFFORT" \
   --setting-sources user \
   --strict-mcp-config \
   --tools "Read,Grep,Glob" \

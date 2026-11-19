@@ -7,7 +7,7 @@ index 111..222 100644
 +import sys
  
  def main():
-@@ -20,4 +21,5 @@ def other():
+@@ -20,3 +21,4 @@ def other():
      a = 1
 --- removed line that looks like a header
 +    b = 2

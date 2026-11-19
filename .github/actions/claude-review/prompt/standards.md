@@ -14,6 +14,6 @@
 - Suggestions to refactor working code without a concrete defect.
 
 ## Confidence
-- Only report a finding when you can point to the exact line in the diff that causes it.
+- Only report a finding when you can point to the exact line that causes it.
 - If you couldn't verify something (for example, it depends on a file or workflow you can't see),
   don't report it as a finding. Mention it in the summary as a question instead.

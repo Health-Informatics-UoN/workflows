@@ -12,7 +12,7 @@ setup() {
   ln -s "$ACTION_DIR/prompt" "$GITHUB_ACTION_PATH/prompt"
   ln -s "$BATS_TEST_DIRNAME/bin/claude" "$GITHUB_ACTION_PATH/node_modules/.bin/claude"
   export CLAUDE_ARGS="$BATS_TEST_TMPDIR/claude-args"
-  export MODEL="claude-test-model" MAX_TURNS="7" ANTHROPIC_API_KEY="test-key"
+  export MODEL="claude-test-model" MAX_TURNS="7" EFFORT="low" ANTHROPIC_API_KEY="test-key"
   export CLAUDE_OUTPUT='{"is_error":false,"num_turns":3,"structured_output":{"findings":[],"summary":"No findings."}}'
 }
 
@@ -42,11 +42,12 @@ has_arg_pair() {
   [ "$(jq -r '.structured_output.summary' "$RUNNER_TEMP/review.json")" = "No findings." ]
 }
 
-@test "the model and turn limit are passed to Claude" {
+@test "the model, turn limit and effort are passed to Claude" {
   run bash "$ACTION_DIR/scripts/review.sh"
   [ "$status" -eq 0 ]
   has_arg_pair --model claude-test-model
   has_arg_pair --max-turns 7
+  has_arg_pair --effort low
 }
 
 @test "the prompt includes the review standards" {

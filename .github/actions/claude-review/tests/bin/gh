@@ -24,7 +24,7 @@ respond() {
 }
 
 no_threads='{"data":{"repository":{"pullRequest":{"reviewThreads":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}}}}}'
-no_comments='{"comments":[]}'
+no_pr='{"title":"","body":""}'
 
 case " $* " in
   *resolveReviewThread*)
@@ -45,6 +45,6 @@ case " $* " in
   *"/compare/"*)
     respond "${GH_COMPARE_DIFF:-}" ;;
   *" pr view "*)
-    respond "${GH_PR_JSON:-$no_comments}" ;;
+    respond "${GH_PR_JSON:-$no_pr}" ;;
   *) ;;
 esac

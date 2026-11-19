@@ -34,6 +34,11 @@ default_of() {
   [ "$(default_of model "$WORKFLOW")" = "$(default_of model "$ACTION_DIR/action.yml")" ]
 }
 
+@test "the workflow and the action have the same effort default" {
+  [ -n "$(default_of effort "$ACTION_DIR/action.yml")" ]
+  [ "$(default_of effort "$WORKFLOW")" = "$(default_of effort "$ACTION_DIR/action.yml")" ]
+}
+
 @test "the defaults are 2000 lines and 25 turns" {
   [ "$(default_of max-lines "$ACTION_DIR/action.yml")" = "2000" ]
   [ "$(default_of max-turns "$ACTION_DIR/action.yml")" = "25" ]
