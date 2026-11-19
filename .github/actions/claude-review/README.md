@@ -10,6 +10,7 @@ The steps are in [`action.yml`](action.yml). Each one runs a script from this fo
 |---|---|---|
 | Check PR size | [`check-size.sh`](check-size.sh) | Skips pull requests over `max-lines` changed lines, and comments once to say so. |
 | Fetch PR | inline, plus [`fetch-discussed.sh`](fetch-discussed.sh) | Saves the PR details, the diff, and earlier findings people have replied to, in `.pr-review/` in the checkout. |
+| Set up Node.js | `actions/setup-node` | Installs Node 24. Claude Code needs Node 22 or later, and the runner image's default changes over time. |
 | Install Claude Code | inline | `npm ci` installs the version pinned in [`package-lock.json`](package-lock.json), checking every package's checksum. |
 | Run Claude review | [`review.sh`](review.sh) | Runs Claude Code read-only with [`prompt.md`](prompt.md) and [`standards.md`](standards.md), and saves its findings. |
 | Post review comments | [`post.sh`](post.sh) | Resolves earlier findings nobody replied to, posts the new findings as one review, and updates the summary comment. |

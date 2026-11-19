@@ -60,6 +60,15 @@ runs:
         gh pr diff "$PR_NUMBER" --repo "$REPO" > .pr-review/pr.diff
         bash "$GITHUB_ACTION_PATH/fetch-discussed.sh"
 
+    # Claude Code needs Node 22 or later. Set it here rather than relying on the runner
+    # image's default, which changes over time (Ubuntu 24.04 images defaulted to Node 20)
+    # and may be missing on self-hosted runners.
+    - name: Set up Node.js
+      if: steps.size.outputs.too-large == 'false'
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: 24
+
     # Installs the Claude Code version pinned in package-lock.json, checking every
     # package against its recorded checksum. Dependabot proposes updates.
     - name: Install Claude Code

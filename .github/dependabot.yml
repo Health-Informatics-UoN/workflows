@@ -1,7 +1,11 @@
 version: 2
 updates:
   - package-ecosystem: "github-actions"
-    directory: "/"
+    # "/" covers the workflows in .github/workflows. Actions in .github/actions/* are
+    # listed too, so the actions they use (such as setup-node) are kept up to date.
+    directories:
+      - "/"
+      - "/.github/actions/*"
     schedule:
       interval: "weekly"
       day: "monday"
