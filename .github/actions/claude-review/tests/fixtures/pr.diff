@@ -1,0 +1,22 @@
+diff --git a/app.py b/app.py
+index 111..222 100644
+--- a/app.py
++++ b/app.py
+@@ -1,3 +1,4 @@
+ import os
++import sys
+ 
+ def main():
+@@ -20,4 +21,5 @@ def other():
+     a = 1
+--- removed line that looks like a header
++    b = 2
++++ added line that looks like a header
+     return a
+diff --git a/old.txt b/old.txt
+deleted file mode 100644
+--- a/old.txt
++++ /dev/null
+@@ -1,2 +0,0 @@
+-gone
+-gone2

@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Fake gh for the tests. Records each call in $GH_CALLS (NNN.args, one argument per
+# line, and NNN.stdin when the call reads stdin) and answers from environment
+# variables holding raw API responses. A --jq/-q filter is applied to the response
+# with jq, as gh does, so the scripts' filters are tested too.
+set -euo pipefail
+
+n=$(printf '%03d' $(( $(find "$GH_CALLS" -name '*.args' | wc -l) + 1 )))
+printf '%s\n' "$@" > "$GH_CALLS/$n.args"
+case " $* " in
+  *"=@-"*|*" --input - "*|*" --body-file - "*) cat > "$GH_CALLS/$n.stdin" ;;
+esac
+
+filter=""
+prev=""
+for arg in "$@"; do
+  if [ "$prev" = "--jq" ] || [ "$prev" = "-q" ]; then filter=$arg; fi
+  prev=$arg
+done
+
+respond() {
+  if [ -n "$filter" ]; then jq -r "$filter" <<< "$1"; else printf '%s\n' "$1"; fi
+}
+
+no_threads='{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}'
+no_comments='{"comments":[]}'
+
+case " $* " in
+  *resolveReviewThread*)
+    [ -z "${GH_FAIL_RESOLVE:-}" ] || exit 1
+    respond '{}' ;;
+  *reviewThreads*)
+    respond "${GH_THREADS_JSON:-$no_threads}" ;;
+  *"/reviews "*)
+    [ -z "${GH_FAIL_REVIEW:-}" ] || exit 1
+    respond '{}' ;;
+  *" PATCH "*)
+    respond '{}' ;;
+  *"/issues/"*"/comments "*)
+    respond "${GH_ISSUE_COMMENTS_JSON:-[]}" ;;
+  *" pr view "*)
+    respond "${GH_PR_JSON:-$no_comments}" ;;
+  *) ;;
+esac
