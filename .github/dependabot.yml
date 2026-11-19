@@ -30,7 +30,7 @@ updates:
   - package-ecosystem: "npm"
     directory: "/.github/actions/claude-review"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
       day: "monday"
     # Wait a week before proposing a new release, so a compromised release
     # that gets pulled quickly never reaches this repo.
