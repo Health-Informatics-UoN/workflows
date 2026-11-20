@@ -1,0 +1,63 @@
+# Test catalogue fields for the demographics schema, with made-up values.
+
+summary:
+  title: NUH Pseudonymised Patient Demographics
+  abstract: >-
+    Pseudonymised demographic data for patients of Nottingham University Hospitals NHS
+    Trust, including sex, gender identity, month of birth, date of death, ethnicity,
+    marital status, religion, nationality and Lower Layer Super Output Area. Intended
+    for linkage with NUH clinical research datasets.
+  contactPoint: data.access@example.org
+  populationSize: -1
+  keywords:
+    - demographics
+    - NHS
+    - Nottingham
+    - pseudonymised
+    - linkage
+    - ethnicity
+
+documentation:
+  description: >-
+    One row per patient, pseudonymised for research use. Dates of birth are given as the
+    first of the month, and home postcode is replaced by the Lower Layer Super Output Area.
+    Coded fields (sex, gender identity, ethnicity, marital status, religion) are provided as
+    both a code and its description, following the NHS Data Dictionary where one exists.
+    Records carry ETL and pipeline run metadata. Access requires a data access request.
+
+coverage:
+  spatial: Nottinghamshire, England
+  typicalAgeRangeMin: 0
+  typicalAgeRangeMax: 110
+
+provenance:
+  origin:
+    purpose: [Care]
+    source: [EPR]
+    collectionSource:
+      - Secondary care - In-patients
+      - Secondary care - Outpatients
+      - Secondary care - Accident and Emergency
+    datasetType:
+      - name: Socioeconomic
+        subTypes: [Ethnicity, Marital status, Religion]
+  temporal:
+    publishingFrequency: Quarterly
+    startDate: "2009-01-01"
+    # No endDate for an ongoing dataset: HDRUK allows "CONTINUOUS", but it fails
+    # TRASER's translation to GWDM 2.2 (the live Gateway would reject an ACTIVE push).
+    timeLag: 1-2 months
+
+accessibility:
+  access:
+    accessRights: In Progress  # replace with the access-request page URL when there is one
+    accessServiceCategory: TRE/SDE
+    jurisdiction: [GB-ENG]
+    dataController: Nottingham University Hospitals NHS Trust
+  formatAndStandards:
+    vocabularyEncodingScheme: [NHS NATIONAL CODES]
+    conformsTo: [NHS DATA DICTIONARY]
+    language: [en]
+    format: [CSV]
+
+observations: []
