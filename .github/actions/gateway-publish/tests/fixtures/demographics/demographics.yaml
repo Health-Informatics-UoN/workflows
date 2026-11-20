@@ -1,0 +1,267 @@
+id: https://health-informatics-uon.github.io/nuh-data/datasets/demographics
+name: demographics
+title: demographics
+description: >-
+  demographics
+
+license: demographics
+
+created_by: https://github.com/Health-Informatics-UoN
+
+annotations:
+  data_custodian: Nottingham University Hospitals NHS Trust
+  created_by_name: Nottingham University Hospitals NHS Trust
+  geographic_coverage: Nottinghamshire, England
+  data_standards: OTHER
+  access_request_type: Data Access Request
+  access_status: In Progress
+
+keywords:
+  - NHS
+  - Nottingham
+  - clinical
+
+prefixes:
+  linkml: https://w3id.org/linkml/
+  SNOMED: http://snomed.info/id/
+  ICD: http://id.who.int/icd/entity/
+  OPCS: https://datadictionary.nhs.uk/attributes/opcs_code/
+  NICIP: https://www.datadictionary.nhs.uk/nhs_business_definitions/nicip_code/
+  dmd: https://dmd.nhs.uk/concept/
+
+default_prefix: demographics
+default_range: string
+
+imports:
+  - linkml:types
+
+classes:
+  CoreDemographics:
+    description: >-
+      Pseudonymised patient demographic data (sex, DOB, ethnicity, LLSOA, etc.) for linkage with clinical datasets.
+    tree_root: true
+    slots:
+      - etl_id
+      - etl_date
+      - core_pid_published_runid
+      - ndo_run_date
+      - pseudo_nhs_number
+      - dob_first_of_month
+      - deceased
+      - date_of_death
+      - sex
+      - sex_desc
+      - gender_identity
+      - gender_identity_desc
+      - admin_gender
+      - ethnicity
+      - ethnicity_desc
+      - marital_status
+      - marital_status_desc
+      - religion
+      - religion_desc
+      - nationality
+      - llsoa
+
+slots:
+  etl_id:
+    description: "Internal identifier for the ETL batch run that loaded this record."
+    range: integer
+    required: false
+    annotations:
+      sql_column: ETL_ID
+      sql_type: "INT"
+
+  etl_date:
+    description: "Date and time the ETL process ran."
+    range: datetime
+    required: false
+    annotations:
+      sql_column: ETL_DATE
+      sql_type: "DATETIME"
+
+  ndo_run_date:
+    description: ""
+    range: date
+    required: false
+    annotations:
+      sql_column: NDO_RUN_DATE
+      sql_type: DATE
+
+  pseudo_nhs_number:
+    description: >-
+      The NHS NUMBER, the primary identifier of a PERSON, is a unique identifier
+      for a PATIENT within the NHS in England and Wales. Pseudonymised for
+      research use.
+    range: string
+    required: false
+    annotations:
+      sql_column: PSEUDO_NHS_NUMBER
+      sql_type: "VARBINARY(100)"
+      sensitivity: pseudonymised
+
+  dob_first_of_month:
+    description: "First of month proxy date of birth."
+    range: date
+    required: false
+    annotations:
+      sql_column: DOB_FIRST_OF_MONTH
+      sql_type: "DATE"
+
+  llsoa:
+    description: >-
+      Lower Layer Super Output Area, derived from PATIENT POSTCODE for
+      geographic analysis while preserving patient privacy.
+    range: string
+    required: false
+    annotations:
+      sql_column: LLSOA
+      sql_type: "NVARCHAR(100)"
+
+  core_pid_published_runid:
+    description: "pipeline meta data"
+    range: integer
+    required: false
+    annotations:
+      sql_column: CORE_PID_PUBLISHED_RUNID
+      sql_type: "INT"
+
+  deceased:
+    description: "an integer code defining wether the participant is deceased"
+    range: integer
+    required: false
+    annotations:
+      sql_column: DECEASED
+      sql_type: "INT"
+
+  date_of_death:
+    description: "The date of the participant's death"
+    range: date
+    required: false
+    annotations:
+      sql_column: DATE_OF_DEATH
+      sql_type: "DATE"
+
+  sex_desc:
+    description: >-
+      The sex of PATIENTS intended to use a WARD indicated in the WARD OPERATIONAL PLANS, with the addition of Home Leave.
+
+      https://www.datadictionary.nhs.uk/data_elements/sex_of_patients_code.html
+    range: string
+    required: false
+    annotations:
+      sql_column: SEX_DESC
+      sql_type: "NVARCHAR(64)"
+
+  sex:
+    description: >-
+      The sex of PATIENTS intended to use a WARD indicated in the WARD OPERATIONAL PLANS, with the addition of Home Leave.
+
+      https://www.datadictionary.nhs.uk/data_elements/sex_of_patients_code.html
+    range: string
+    required: false
+    annotations:
+      sql_column: SEX
+      sql_type: "NVARCHAR(6)"
+
+  gender_identity_desc:
+    description: >-
+      The gender identity of a PERSON as stated by the PERSON.
+
+      https://www.datadictionary.nhs.uk/attributes/gender_identity_code.html
+    range: string
+    required: false
+    annotations:
+      sql_column: GENDER_IDENTITY_DESC
+      sql_type: "NVARCHAR(64)"
+
+  gender_identity:
+    description: >-
+      The gender identity of a PERSON as stated by the PERSON.
+
+      https://www.datadictionary.nhs.uk/attributes/gender_identity_code.html
+    range: string
+    required: false
+    annotations:
+      sql_column: GENDER_IDENTITY
+      sql_type: "NVARCHAR(6)"
+
+  admin_gender:
+    description: "a code detailing the patient's gender from and administrative perspective"
+    range: string
+    required: false
+    annotations:
+      sql_column: ADMIN_GENDER
+      sql_type: "NVARCHAR(64)"
+
+  ethnicity_desc:
+    description: >-
+      The ethnicity of a PERSON, as specified by the PERSON.
+
+    range: string
+    required: false
+    annotations:
+      sql_column: ETHNICITY_DESC
+      sql_type: "NVARCHAR(64)"
+
+  ethnicity:
+    description: >-
+      The ethnicity of a PERSON, as specified by the PERSON.
+      
+    range: string
+    required: false
+    annotations:
+      sql_column: ETHNICITY
+      sql_type: "NVARCHAR(6)"
+
+  marital_status_desc:
+    description: >-
+      An indicator to identify the legal marital status of a PERSON.
+
+      https://www.datadictionary.nhs.uk/data_elements/person_marital_status.html
+    range: string
+    required: false
+    annotations:
+      sql_column: MARITAL_STATUS_DESC
+      sql_type: "NVARCHAR(64)"
+
+  marital_status:
+    description: >-
+      An indicator to identify the legal marital status of a PERSON.
+
+      https://www.datadictionary.nhs.uk/data_elements/person_marital_status.html
+    range: string
+    required: false
+    annotations:
+      sql_column: MARITAL_STATUS
+      sql_type: "NVARCHAR(6)"
+
+  religion_desc:
+    description: >-
+      The RELIGIOUS OR OTHER BELIEF SYSTEM AFFILIATION  of a PERSON , as specified by a PERSON .
+
+      https://archive.datadictionary.nhs.uk/DD%20Release%20May%202024/attributes/religious_or_other_belief_system_affiliation_code.html
+    range: string
+    required: false
+    annotations:
+      sql_column: RELIGION_DESC
+      sql_type: "NVARCHAR(64)"
+
+  religion:
+    description: >-
+      The RELIGIOUS OR OTHER BELIEF SYSTEM AFFILIATION  of a PERSON , as specified by a PERSON .
+      
+      https://archive.datadictionary.nhs.uk/DD%20Release%20May%202024/attributes/religious_or_other_belief_system_affiliation_code.html
+    range: string
+    required: false
+    annotations:
+      sql_column: RELIGION
+      sql_type: "NVARCHAR(6)"
+
+  nationality:
+    description: a text description of the patient's nationality
+    range: string
+    required: false
+    annotations:
+      sql_column: NATIONALITY
+      sql_type: "NVARCHAR(50)"

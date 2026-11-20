@@ -1,0 +1,13 @@
+# Sample PR check for a dataset repo that publishes to the HDR UK Gateway: builds and
+# validates the metadata on every PR, without secrets and without publishing.
+
+name: "Check Gateway metadata"
+
+on:
+  pull_request:
+
+jobs:
+  gateway:
+    uses: health-informatics-uon/workflows/.github/workflows/gateway-validate.yml@main
+    permissions:
+      contents: read

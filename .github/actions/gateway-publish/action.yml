@@ -1,0 +1,87 @@
+name: HDR UK Gateway publish
+description: >-
+  Builds HDR UK Health Data Research Gateway metadata (HDRUK 4.1.0) from a LinkML schema
+  plus hand-written catalogue fields in gateway/, validates it, and with `command: push`
+  sends it to the Gateway as a new version of an existing dataset. Run it after checking
+  out the dataset repo. Most repositories should call the reusable workflows
+  (gateway-validate.yml, gateway-publish.yml), not this action.
+
+inputs:
+  command:
+    description: >-
+      validate (build and validate; needs no credentials) or push (build, validate, send a
+      new version, and read it back).
+    required: true
+  dataset-dir:
+    description: Directory holding gateway/metadata.yaml and gateway/gateway.yaml, relative to the workspace.
+    default: "."
+  schema:
+    description: >-
+      LinkML schema, relative to the workspace. Default: the only *.yaml in dataset-dir,
+      else in dataset-dir/schemas.
+    default: ""
+  version:
+    description: >-
+      Metadata version, major.minor.patch (a leading v is removed). Required for push;
+      validate uses 0.0.0 if empty.
+    default: ""
+  status:
+    description: DRAFT or ACTIVE. Default is the status in gateway.yaml, else DRAFT.
+    default: ""
+  dry-run:
+    description: With push, print the request instead of sending it. Needs no credentials.
+    default: "false"
+  traser:
+    description: >-
+      Also check the metadata with HDR UK's TRASER service, the way the Gateway does. Local
+      schema validation misses some errors that the Gateway rejects.
+    default: "true"
+  traser-url:
+    description: TRASER base URL. Default is HDR UK's dev instance.
+    default: ""
+  base-url:
+    description: Gateway API base URL.
+    default: https://api.healthdatagateway.org/api
+  allow-unknown-host:
+    description: Send credentials to a base-url that isn't a known Gateway host.
+    default: "false"
+  team-id:
+    description: Gateway team ID. Default is team_id in gateway.yaml; if set, it must match.
+    default: ""
+  app-id:
+    description: The Private App's App ID. Required for push, unless dry-run.
+    default: ""
+  client-id:
+    description: The Private App's Client ID. Required for push, unless dry-run.
+    default: ""
+  python-version:
+    description: Python version to run the tool with.
+    default: "3.13"
+
+runs:
+  using: composite
+  steps:
+    # uv installs the dependencies pinned in this action's uv.lock.
+    - name: Set up uv
+      uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      with:
+        python-version: ${{ inputs.python-version }}
+        enable-cache: false
+
+    - name: Run gateway-publish
+      shell: bash
+      env:
+        COMMAND: ${{ inputs.command }}
+        DATASET_DIR: ${{ inputs.dataset-dir }}
+        SCHEMA: ${{ inputs.schema }}
+        VERSION: ${{ inputs.version }}
+        STATUS: ${{ inputs.status }}
+        DRY_RUN: ${{ inputs.dry-run }}
+        TRASER: ${{ inputs.traser }}
+        TRASER_URL: ${{ inputs.traser-url }}
+        GATEWAY_BASE_URL: ${{ inputs.base-url }}
+        GATEWAY_ALLOW_UNKNOWN_HOST: ${{ inputs.allow-unknown-host == 'true' && '1' || '' }}
+        GATEWAY_TEAM_ID: ${{ inputs.team-id }}
+        GATEWAY_APP_ID: ${{ inputs.app-id }}
+        GATEWAY_CLIENT_ID: ${{ inputs.client-id }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/run.sh"

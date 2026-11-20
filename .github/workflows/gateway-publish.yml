@@ -1,0 +1,135 @@
+# Publishes a dataset repo's metadata to the HDR UK Health Data Research Gateway as a new
+# version of an existing dataset. Call it after semantic-release creates a release (see
+# samples/release.gateway.yaml). Each call adds a Gateway version, even if nothing changed.
+#
+# The dataset must already exist on the Gateway, with its ID in gateway/gateway.yaml.
+# Creating it is a one-off manual step (docs/workflows/gateway-publish.md), so this
+# workflow never creates datasets and never writes to the repository.
+#
+# The validate job needs no secrets, so a broken release fails before anyone is asked to
+# approve. The publish job runs in a GitHub environment (default `gateway`): give it
+# required reviewers, and keep the credentials there as environment secrets.
+name: HDR UK Gateway Publish
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Metadata version, major.minor.patch (a leading v is removed). Usually the release tag.
+        type: string
+        required: true
+      ref:
+        description: Git ref to publish from. Default the version input, which is the release tag.
+        type: string
+        default: ""
+      dataset-dir:
+        description: Directory holding gateway/ (default the repository root).
+        type: string
+        default: "."
+      schema:
+        description: LinkML schema. Default the only *.yaml in dataset-dir, else in dataset-dir/schemas.
+        type: string
+        default: ""
+      status:
+        description: DRAFT or ACTIVE. Default the status in gateway.yaml, else DRAFT.
+        type: string
+        default: ""
+      dry-run:
+        description: Print the request instead of sending it.
+        type: boolean
+        default: false
+      environment:
+        description: GitHub environment for the publish job. Create it, with required reviewers, before the first release.
+        type: string
+        default: gateway
+      base-url:
+        description: Gateway API base URL.
+        type: string
+        default: https://api.healthdatagateway.org/api
+      team-id:
+        description: Gateway team ID. Default team_id in gateway.yaml; if set, it must match.
+        type: string
+        default: ""
+      traser:
+        description: Also check the metadata with TRASER, as the Gateway does.
+        type: boolean
+        default: true
+      traser-url:
+        description: TRASER base URL. Default HDR UK's dev instance.
+        type: string
+        default: ""
+    secrets:
+      # Not required, so that dry runs work without them, and so that environment secrets
+      # can be used: a caller with `secrets: inherit` gets the publish job's environment
+      # secrets of the same name.
+      GATEWAY_APP_ID:
+        description: The Gateway Private App's App ID.
+        required: false
+      GATEWAY_CLIENT_ID:
+        description: The Gateway Private App's Client ID.
+        required: false
+
+permissions: {}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || inputs.version }}
+          persist-credentials: false
+
+      # $/ is the repository of this workflow, at the commit that runs, so the action is
+      # the same version as the workflow that the caller pinned.
+      - name: Validate Gateway metadata
+        uses: $/.github/actions/gateway-publish
+        with:
+          command: validate
+          dataset-dir: ${{ inputs.dataset-dir }}
+          schema: ${{ inputs.schema }}
+          version: ${{ inputs.version }}
+          traser: ${{ inputs.traser }}
+          traser-url: ${{ inputs.traser-url }}
+
+  publish:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+    # One publish at a time per repository. A queued run waits rather than being
+    # cancelled, so every release is published, in order.
+    concurrency:
+      group: gateway-publish-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - name: Check out the release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || inputs.version }}
+          persist-credentials: false
+
+      # Validates again (the same checks), sends the new version, then reads the dataset
+      # back and fails unless the version went up and the title matches. A failed update
+      # is not retried, because a retry could add a second version.
+      - name: Publish to the Gateway
+        uses: $/.github/actions/gateway-publish
+        with:
+          command: push
+          dataset-dir: ${{ inputs.dataset-dir }}
+          schema: ${{ inputs.schema }}
+          version: ${{ inputs.version }}
+          status: ${{ inputs.status }}
+          dry-run: ${{ inputs.dry-run }}
+          base-url: ${{ inputs.base-url }}
+          team-id: ${{ inputs.team-id }}
+          traser: ${{ inputs.traser }}
+          traser-url: ${{ inputs.traser-url }}
+          app-id: ${{ secrets.GATEWAY_APP_ID }}
+          client-id: ${{ secrets.GATEWAY_CLIENT_ID }}

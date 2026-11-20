@@ -1,0 +1,100 @@
+{
+      "identifier": "226fb3f1-4471-400a-8c39-2b66d46a39b6",
+      "modified": "2025-12-19T12:18:11+00:00",
+      "issued": "2025-12-19T12:18:11+00:00",
+      "observations": [],
+      "coverage": {
+            "followUp": null,
+            "materialType": [
+                  "None/not available"
+            ],
+            "spatial": "UK"
+      },
+      "provenance": {
+            "origin": {
+                  "datasetType": [
+                        {
+                              "name": "Health and disease",
+                              "subTypes": []
+                        }
+                  ]
+            },
+            "temporal": {
+                  "timeLag": "Variable",
+                  "startDate": "2025-12-01T00:00:00.000Z",
+                  "publishingFrequency": "Monthly"
+            }
+      },
+      "accessibility": {
+            "formatAndStandards": {
+                  "format": [
+                        "text",
+                        "tab-separted-values",
+                        "csv"
+                  ],
+                  "language": [
+                        "en"
+                  ],
+                  "conformsTo": [
+                        "LOCAL",
+                        "BNF",
+                        "DDI",
+                        "DCAT"
+                  ],
+                  "vocabularyEncodingScheme": [
+                        "LOCAL"
+                  ]
+            },
+            "access": {
+                  "dataProcessor": "__TestTeam",
+                  "dataController": "__TestTeam",
+                  "jurisdiction": [
+                        "UK"
+                  ],
+                  "deliveryLeadTime": null,
+                  "accessRequestCost": "https://example.org/applying-access-resource",
+                  "accessService": null,
+                  "accessRights": "https://example.org/applying-access-resource"
+            },
+            "usage": {
+                  "dataUseRequirements": [],
+                  "dataUseLimitation": [
+                        "General research use"
+                  ],
+                  "duoCodes": [
+                        "DUO:0000042",
+                        "DUO:0000021"
+                  ],
+                  "dataUsePermissions": {
+                        "patientRecontact": "Yes"
+                  }
+            }
+      },
+      "documentation": {
+            "description": "Example"
+      },
+      "summary": {
+            "contactPoint": "test.custodian@example.com",
+            "populationSize": -1,
+            "dataCustodian": {
+                  "memberOf": null,
+                  "contactPoint": "test.custodian@example.com",
+                  "description": "__TestTeam",
+                  "logo": null,
+                  "name": "__TestTeam",
+                  "identifier": "133"
+            },
+            "abstract": "Example",
+            "title": "Example"
+      },
+      "revisions": [
+            {
+                  "version": "1.0.0",
+                  "url": "http://www.example.com/"
+            }
+      ],
+      "version": "1.0.0",
+      "structuralMetadata": {
+            "tables": []
+      }
+}

@@ -39,3 +39,13 @@ updates:
       default-days: 7
     commit-message:
       prefix: "fix(dependencies): "
+
+  # This entry updates the Python dependencies of the gateway-publish action (uv.lock).
+  - package-ecosystem: "uv"
+    directory: "/.github/actions/gateway-publish"
+    schedule:
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "fix(dependencies): "
