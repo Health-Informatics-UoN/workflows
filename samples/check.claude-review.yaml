@@ -1,0 +1,22 @@
+name: "Claude PR review"
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - ready_for_review
+      # Adding the claude-review label requests a review.
+      - labeled
+
+permissions: {}
+
+jobs:
+  claude:
+    # Replace <NEW_SHA> and <NEW_VERSION> with a release that includes claude-review.yml.
+    uses: health-informatics-uon/workflows/.github/workflows/claude-review.yml@<NEW_SHA> # <NEW_VERSION>
+    permissions:
+      contents: read
+      pull-requests: write
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

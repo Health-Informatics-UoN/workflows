@@ -1,0 +1,20 @@
+name: Claude PR Review (self)
+
+on:
+  pull_request:
+    # labeled: when someone adds the claude-review label, this requests a review.
+    types: [opened, synchronize, ready_for_review, labeled]
+
+permissions: {}
+
+jobs:
+  claude:
+    # ./ matches the other callers here. For a job-level call in the same repository,
+    # ./ and $/ load the workflow from the same commit. A separate PR will change all
+    # same-repository calls to $/ and remove this ignore.
+    uses: ./.github/workflows/claude-review.yml # zizmor: ignore[self-repository]
+    permissions:
+      contents: read
+      pull-requests: write
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
