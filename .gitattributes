@@ -1,0 +1,2 @@
+# npm generates this file. GitHub collapses generated files in pull request diffs.
+.github/actions/claude-review/package-lock.json linguist-generated=true

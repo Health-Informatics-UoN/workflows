@@ -1,0 +1,97 @@
+name: Claude PR review
+description: >-
+  Reviews a pull request with Claude Code, read-only, and posts the findings as
+  inline comments plus a summary comment. Run it on pull_request events, after
+  checking out the PR head commit (ref: github.event.pull_request.head.sha) with
+  persist-credentials: false, because Claude can read .git/config.
+
+inputs:
+  anthropic-api-key:
+    description: >-
+      Claude Console API key. The monthly API credits of Claude Max, Ultra and Team
+      plans (not Enterprise) cover this (`claude -p` run with an API key is billed as Agent SDK
+      usage); they don't cover anthropics/claude-code-action, which is why this
+      action runs the CLI directly. https://support.claude.com/en/articles/17154008
+    required: true
+  github-token:
+    description: Token used to read the PR and post comments. Needs pull-requests write.
+    default: ${{ github.token }}
+  model:
+    description: Claude model to use.
+    default: claude-opus-5-5
+  # max-turns and max-lines are related. Claude uses turns to read files, so a larger
+  # PR needs more turns. If Claude uses all turns, the review fails.
+  max-turns:
+    description: Maximum number of Claude turns per review; limits cost.
+    default: "25"
+  max-lines:
+    description: Skip PRs with more changed lines (additions + deletions) than this.
+    default: "2000"
+  effort:
+    description: How much Claude thinks (low, medium, high, xhigh or max). Higher finds more, and costs more.
+    default: high
+
+runs:
+  using: composite
+  steps:
+    - name: Check PR size
+      id: size
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        PR_URL: ${{ github.event.pull_request.html_url }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        ADDITIONS: ${{ github.event.pull_request.additions }}
+        DELETIONS: ${{ github.event.pull_request.deletions }}
+        MAX_LINES: ${{ inputs.max-lines }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/check-size.sh"
+
+    # This step gets the PR, so the Claude step needs no GitHub token. It does not give
+    # Claude untrusted comments (refer to fetch-pr.sh).
+    - name: Fetch PR
+      if: steps.size.outputs.too-large == 'false'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/fetch-pr.sh"
+
+    # Claude Code needs Node 22 or later. The default of the runner image changes over
+    # time (it was Node 20 on Ubuntu 24.04), and self-hosted runners possibly do not
+    # have Node.js.
+    - name: Set up Node.js
+      if: steps.size.outputs.too-large == 'false'
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: 24
+
+    # Installs the Claude Code version that package-lock.json pins. npm compares each
+    # package with its recorded checksum. Dependabot proposes updates.
+    - name: Install Claude Code
+      if: steps.size.outputs.too-large == 'false'
+      shell: bash
+      run: npm ci --prefix "$GITHUB_ACTION_PATH" --no-audit --no-fund
+
+    - name: Run Claude review
+      if: steps.size.outputs.too-large == 'false'
+      shell: bash
+      env:
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        MODEL: ${{ inputs.model }}
+        MAX_TURNS: ${{ inputs.max-turns }}
+        EFFORT: ${{ inputs.effort }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/review.sh"
+
+    - name: Post review comments
+      if: steps.size.outputs.too-large == 'false'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/post.sh"

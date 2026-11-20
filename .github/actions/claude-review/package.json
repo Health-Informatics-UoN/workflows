@@ -1,0 +1,11 @@
+{
+  "name": "claude-review-action",
+  "private": true,
+  "description": "Pins the Claude Code CLI used by the Claude review action.",
+  "dependencies": {
+    "@anthropic-ai/claude-code": "2.1.325"
+  },
+  "allowScripts": {
+    "@anthropic-ai/claude-code": true
+  }
+}

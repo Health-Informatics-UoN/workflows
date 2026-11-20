@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# This is a fake Claude Code for the tests. It records its arguments in $CLAUDE_ARGS
+# (one argument on each line). It shows $CLAUDE_OUTPUT and exits with $CLAUDE_EXIT.
+printf '%s\n' "$@" > "$CLAUDE_ARGS"
+printf '%s' "${CLAUDE_OUTPUT:-}"
+exit "${CLAUDE_EXIT:-0}"

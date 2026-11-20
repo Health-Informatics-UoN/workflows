@@ -1,0 +1,20 @@
+{
+  "type": "object",
+  "properties": {
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "line": { "type": "integer" },
+          "start_line": { "type": "integer" },
+          "body": { "type": "string" }
+        },
+        "required": ["path", "line", "body"]
+      }
+    },
+    "summary": { "type": "string" }
+  },
+  "required": ["findings", "summary"]
+}

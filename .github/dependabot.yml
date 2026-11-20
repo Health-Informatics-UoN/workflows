@@ -1,7 +1,12 @@
 version: 2
 updates:
   - package-ecosystem: "github-actions"
-    directory: "/"
+    # "/" includes the workflows in .github/workflows. The list also has the actions
+    # in .github/actions/*. Thus, Dependabot also updates the actions that they use (for
+    # example, setup-node).
+    directories:
+      - "/"
+      - "/.github/actions/*"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -22,4 +27,15 @@ updates:
       - dependency-name: "tyriis/docker-image-tag-exists"
         versions: [">= 2026"]
 
-
+  # This entry updates the Claude Code CLI that the Claude review action uses
+  # (package-lock.json).
+  - package-ecosystem: "npm"
+    directory: "/.github/actions/claude-review"
+    schedule:
+      interval: "monthly"
+    # Wait one week before Dependabot proposes a new release. Thus, if a release is
+    # compromised and quickly removed, the release never gets to this repo.
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "fix(dependencies): "

@@ -26,3 +26,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-check
           fail_level: error
+
+      # actionlint checks run: blocks in workflows, but not the action scripts.
+      - name: Run shellcheck on action scripts
+        run: find .github/actions -name '*.sh' -print0 | xargs -0 --no-run-if-empty shellcheck
