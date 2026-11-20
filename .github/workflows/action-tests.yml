@@ -8,12 +8,14 @@ on:
     paths:
       - ".github/actions/**"
       - ".github/workflows/action-tests.yml"
+      - ".github/workflows/claude-review.yml"  # defaults.bats reads it
   push:
     branches:
       - main
     paths:
       - ".github/actions/**"
       - ".github/workflows/action-tests.yml"
+      - ".github/workflows/claude-review.yml"  # defaults.bats reads it
 
 permissions:
   contents: read
