@@ -48,7 +48,7 @@ runs:
       run: bash "$GITHUB_ACTION_PATH/scripts/check-size.sh"
 
     # This step gets the PR, so the Claude step needs no GitHub token. It does not give
-    # Claude untrusted comments (refer to fetch-pr.sh).
+    # Claude untrusted comments (refer to fetch-pr.sh and fetch-discussed.sh).
     - name: Fetch PR
       if: steps.size.outputs.too-large == 'false'
       shell: bash
@@ -58,7 +58,9 @@ runs:
         PR_NUMBER: ${{ github.event.pull_request.number }}
         BASE_SHA: ${{ github.event.pull_request.base.sha }}
         HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-      run: bash "$GITHUB_ACTION_PATH/scripts/fetch-pr.sh"
+      run: |
+        bash "$GITHUB_ACTION_PATH/scripts/fetch-pr.sh"
+        bash "$GITHUB_ACTION_PATH/scripts/fetch-discussed.sh"
 
     # Claude Code needs Node 22 or later. The default of the runner image changes over
     # time (it was Node 20 on Ubuntu 24.04), and self-hosted runners possibly do not

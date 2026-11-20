@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # This script posts the findings in $RUNNER_TEMP/review.json to the PR:
-#   1. It posts the findings as one review, so all findings make one notification.
-#   2. It posts a new summary at the bottom of the PR and deletes the earlier summaries.
+#   1. It processes the findings from earlier runs that have no replies. If the token
+#      has permission, it resolves them. If not, it marks them as superseded.
+#   2. It posts the findings as one review, so all findings make one notification.
+#   3. It posts a new summary at the bottom of the PR and deletes the earlier summaries.
 # The summary shows the findings that are not on a diff line, so no finding is lost.
 #
 # Environment (action.yml sets these values):
@@ -9,17 +11,20 @@
 #   PR_NUMBER   the PR number
 #   HEAD_SHA    the PR commit that Claude reviewed. The comments attach to this commit.
 #   GH_TOKEN    the token that gh uses. It needs pull-requests: write.
-#   RUNNER_TEMP the folder with review.json (from review.sh)
+#   RUNNER_TEMP the folder with review.json (from review.sh) and threads.json (the
+#               review threads of the PR, from fetch-discussed.sh)
 # The current directory is the checkout. It contains the diff in .pr-review/pr.diff.
 set -euo pipefail
 
 out="$RUNNER_TEMP/review.json"
+threads_file="$RUNNER_TEMP/threads.json"
 commentable_file="$RUNNER_TEMP/commentable.json"
 diff=".pr-review/pr.diff"
 
 # Hidden HTML markers identify the comments of this action on later runs.
 finding_marker="<!-- claude-review-finding -->"
 summary_marker="<!-- claude-review-summary -->"
+superseded_marker="<!-- claude-review-superseded -->"
 
 # --- Find the lines that can have a comment ------------------------------------------
 #
@@ -122,7 +127,67 @@ split=$(jq --slurpfile commentable "$commentable_file" --arg marker "$finding_ma
   | {comments: map(.comment // empty), unanchored: map(.unanchored // empty)}
 ' "$out")
 
-# --- 1. Post the findings as one review ----------------------------------------------
+# --- 1. Earlier findings that have no replies ----------------------------------------
+#
+# Each run reviews the full PR again, so its findings replace the earlier findings.
+# The default token cannot resolve threads ("Resource not accessible by integration"),
+# and this action does not ask for more permission. Then the script adds a superseded
+# note to the top of the bot comment, and people resolve the thread. The script does
+# not change a thread with a reply, because it is a conversation between people.
+# The filter keeps open threads without replies that a bot started with our marker and
+# that are not superseded. Anyone can copy the marker, so the bot check is important.
+# threads.json is from before the review. A person can reply during the review, so
+# the loop gets the state of each thread again just before it changes the thread.
+threads=$(jq -r --arg finding "$finding_marker" --arg superseded "$superseded_marker" '
+  .[]
+  | select(.isResolved | not)
+  | select(.comments.totalCount == 1)
+  | select(.comments.nodes[0].author.__typename == "Bot")
+  | select(.comments.nodes[0].body | contains($finding))
+  | select(.comments.nodes[0].body | contains($superseded) | not)
+  | {id, comment: .comments.nodes[0].databaseId, body: .comments.nodes[0].body}
+  | tojson
+' "$threads_file")
+
+superseded=0
+while IFS= read -r thread; do
+  [ -n "$thread" ] || continue
+  id=$(jq -r '.id' <<< "$thread")
+
+  # Skip the thread if it now has a reply or is resolved. If the check fails, skip the
+  # thread too: the new findings are more important.
+  # shellcheck disable=SC2016
+  now=$(gh api graphql -F id="$id" -f query='
+    query($id: ID!) { node(id: $id) { ... on PullRequestReviewThread {
+      isResolved comments(first: 1) { totalCount } } } }' \
+    --jq '.data.node | "\(.isResolved) \(.comments.totalCount)"') \
+    || { echo "::warning::Could not check review thread $id"; continue; }
+  [ "$now" = "false 1" ] || continue
+
+  # shellcheck disable=SC2016
+  if gh api graphql -F id="$id" -f query='
+       mutation($id: ID!) { resolveReviewThread(input: {threadId: $id}) { thread { id } } }' \
+       > /dev/null 2>&1; then
+    continue
+  fi
+
+  # The token cannot resolve the thread, so mark the comment as superseded.
+  comment=$(jq -r '.comment' <<< "$thread")
+  if jq -r --arg sha "${HEAD_SHA:0:7}" --arg marker "$superseded_marker" \
+       '"**Superseded** by the review of `\($sha)`. This finding is from an earlier review and may no longer apply. Resolve this thread when you have checked it.\n\($marker)\n\n" + .body' \
+       <<< "$thread" \
+     | gh api -X PATCH "repos/${REPO}/pulls/comments/${comment}" -F body=@- > /dev/null; then
+    superseded=$((superseded + 1))
+  else
+    echo "::warning::Could not resolve or mark review thread $id"
+  fi
+done <<< "$threads"
+
+if [ "$superseded" -gt 0 ]; then
+  echo "::notice::Marked $superseded earlier finding(s) as superseded; the token can't resolve review threads."
+fi
+
+# --- 2. Post the findings as one review ----------------------------------------------
 #
 # "event": "COMMENT" does not approve or request changes. If GitHub rejects the review,
 # the summary gets all findings (without the marker), so no finding is lost.
@@ -138,7 +203,7 @@ if [ "$count" -gt 0 ]; then
   fi
 fi
 
-# --- 2. Post the summary at the bottom, and delete the previous one -------------------
+# --- 3. Post the summary at the bottom, and delete the previous one -------------------
 #
 # A new summary at the bottom tells people that the review ran. An edited summary stays
 # far up in the PR, where people do not look, and nobody gets a notification.

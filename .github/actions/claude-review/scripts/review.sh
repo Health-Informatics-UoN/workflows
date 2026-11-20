@@ -43,8 +43,8 @@ $(cat "$GITHUB_ACTION_PATH/prompt/standards.md")"
 #   Claude Code refuses all that is not permitted, also symlinks out of the checkout.
 # --disallowedTools: a second barrier. It denies Read, Grep and Glob on locations with
 #   secrets, for example /proc/self/environ (it contains the API key). It also denies
-#   $RUNNER_TEMP, outside the checkout, where the action keeps its working files.
-#   "//" is an absolute path and "~" is the home folder.
+#   $RUNNER_TEMP: its threads.json has comments from any person, which Claude must not
+#   read. "//" is an absolute path and "~" is the home folder.
 allow="Read(./**),Grep(./**),Glob(./**)"
 # The "~" is for Claude Code, not for the shell, so the shell must not expand it.
 # shellcheck disable=SC2088

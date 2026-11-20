@@ -44,3 +44,50 @@ write_review() {
     '{is_error: false, structured_output: {findings: $findings, summary: $summary}}' \
     > "$RUNNER_TEMP/review.json"
 }
+
+# --- Review threads, in the format of the GitHub GraphQL API -------------------------
+
+# Makes one review thread, as JSON.
+#   $1  the text of the first comment
+#   $2  the replies, as a JSON array of comment nodes (see reply); default: no replies
+#   $3  the status of the thread: true (resolved) or false (open); default true
+#   $4  the author type of the first comment: "Bot" or "User"; default "Bot"
+#   $5  the thread id; default T_1
+# The id (databaseId) of the first comment is always 901.
+thread() {
+  jq -n --arg first "$1" --argjson replies "${2:-[]}" --argjson resolved "${3:-true}" \
+    --arg type "${4:-Bot}" --arg id "${5:-T_1}" '{
+    id: $id, isResolved: $resolved, path: "app.py", line: 2, originalLine: 2,
+    comments: {
+      totalCount: (1 + ($replies | length)),
+      nodes: ([{databaseId: 901, body: $first, authorAssociation: "NONE",
+        author: {__typename: $type, login: "github-actions"}}] + $replies)
+    }
+  }'
+}
+
+# Makes one reply, as a JSON comment node. $1: login, $2: authorAssociation, $3: text.
+reply() {
+  jq -n --arg login "$1" --arg association "$2" --arg body "$3" \
+    '{body: $body, authorAssociation: $association, author: {__typename: "User", login: $login}}'
+}
+
+# Shows the last page of review threads from the GraphQL API. Arguments: see thread.
+threads_page() {
+  jq -s '{data: {repository: {pullRequest: {reviewThreads: {
+    pageInfo: {hasNextPage: false, endCursor: null}, nodes: .}}}}}' <<< "$*"
+}
+
+# Sets the review threads of the PR (see thread). No arguments means no threads. Writes
+# them to GH_THREADS_JSON (the fake gh answer, for fetch-discussed.sh) and to
+# $RUNNER_TEMP/threads.json (the list that fetch-discussed.sh saves and post.sh reads).
+set_threads() {
+  GH_THREADS_JSON=$(threads_page "$@")
+  export GH_THREADS_JSON
+  jq -s '.' <<< "$*" > "$RUNNER_TEMP/threads.json"
+}
+
+# Shows the text of finding $1 as this action posts it, with the hidden marker.
+as_finding() {
+  printf '%s\n\n<!-- claude-review-finding -->' "$1"
+}

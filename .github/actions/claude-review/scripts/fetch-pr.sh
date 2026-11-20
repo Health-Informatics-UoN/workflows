@@ -5,7 +5,7 @@
 #
 # The script gets the PR before Claude starts, so the Claude step needs no GitHub token.
 # It does not get the PR comments: any person can post them, so they can contain
-# injected instructions.
+# injected instructions. (fetch-discussed.sh gets the trusted replies to old findings.)
 #
 # The diff is for BASE_SHA...HEAD_SHA, the commits in the event that started this run,
 # not the current state of the PR. The checkout and post.sh also use HEAD_SHA. Thus, the

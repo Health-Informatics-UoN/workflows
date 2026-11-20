@@ -20,6 +20,7 @@ setup() {
   common_setup
   mkdir -p .pr-review
   cp "$BATS_TEST_DIRNAME/fixtures/pr.diff" .pr-review/pr.diff
+  set_threads  # There are no review threads, unless a test sets them.
 }
 
 posted_review() {
@@ -96,6 +97,120 @@ posted_summary() {
   posted_summary | grep -qF '0 inline finding(s)'
   posted_summary | grep -qF 'No problems found.'
   ! posted_summary | grep -qF 'could not be attached'
+}
+
+@test "only this action's open threads from earlier runs are resolved" {
+  set_threads \
+    "$(thread "$(as_finding Old)" '[]' false Bot T_ours_open)" \
+    "$(thread "$(as_finding Old)" '[]' true Bot T_ours_resolved)" \
+    "$(thread 'A reviewer comment' '[]' false User T_person)"
+  write_review '[]'
+  run bash "$ACTION_DIR/scripts/post.sh"
+  [ "$status" -eq 0 ]
+  [ "$(count_calls resolveReviewThread)" -eq 1 ]
+  grep -qx "id=T_ours_open" "$(calls_with resolveReviewThread)"
+}
+
+@test "a person's thread containing a copied marker isn't resolved" {
+  set_threads "$(thread "$(as_finding Mine)" '[]' false User T_forged)"
+  write_review '[]'
+  run bash "$ACTION_DIR/scripts/post.sh"
+  [ "$status" -eq 0 ]
+  [ "$(count_calls resolveReviewThread)" -eq 0 ]
+}
+
+@test "a thread from an earlier run that someone has replied to is left open" {
+  set_threads \
+    "$(thread "$(as_finding Old)" "[$(reply alice MEMBER 'I disagree')]" false Bot T_replied)" \
+    "$(thread "$(as_finding Old)" '[]' false Bot T_no_reply)"
+  write_review '[]'
+  run bash "$ACTION_DIR/scripts/post.sh"
+  [ "$status" -eq 0 ]
+  [ "$(count_calls resolveReviewThread)" -eq 1 ]
+  grep -qx "id=T_no_reply" "$(calls_with resolveReviewThread)"
+}
+
+@test "earlier threads are resolved before the new review is posted" {
+  set_threads "$(thread "$(as_finding Old)" '[]' false)"
+  write_review '[{"path":"app.py","line":2,"body":"New"}]'
+  run bash "$ACTION_DIR/scripts/post.sh"
+  resolve=$(basename "$(calls_with resolveReviewThread)")
+  review=$(basename "$(calls_with /reviews)")
+  [[ "$resolve" < "$review" ]]
+}
+
+@test "a thread the token can't resolve is marked as superseded instead" {
+  export GH_FAIL_RESOLVE=1
+  set_threads "$(thread "$(as_finding 'Old finding')" '[]' false)"
+  write_review '[{"path":"app.py","line":2,"body":"New"}]'
+  run bash "$ACTION_DIR/scripts/post.sh"
+  [ "$status" -eq 0 ]
+  grep -qx "repos/org/repo/pulls/comments/901" "$(calls_with pulls/comments/)"
+  edited=$(stdin_of pulls/comments/)
+  [[ "$edited" == "**Superseded** by the review of \`abcdef1\`."* ]]
+  [[ "$edited" == *"<!-- claude-review-superseded -->"* ]]
+  [[ "$edited" == *"$(as_finding 'Old finding')" ]]
+  [[ "$output" == *"::notice::Marked 1 earlier finding(s) as superseded"* ]]
+  [[ "$output" != *"::warning::"* ]]
+  [ "$(count_calls /reviews)" -eq 1 ]
+}
+
+@test "a thread that is resolved isn't also marked as superseded" {
+  set_threads "$(thread "$(as_finding Old)" '[]' false)"
+  write_review '[]'
+  run bash "$ACTION_DIR/scripts/post.sh"
+  [ "$(count_calls resolveReviewThread)" -eq 1 ]
+  [ -z "$(calls_with pulls/comments/)" ]
+}
+
+@test "a finding already marked as superseded is left alone" {
+  export GH_FAIL_RESOLVE=1
+  marked=$'**Superseded** by ...\n<!-- claude-review-superseded -->\n\n'"$(as_finding Old)"
+  set_threads "$(thread "$marked" '[]' false)"
+  write_review '[]'
+  run bash "$ACTION_DIR/scripts/post.sh"
+  [ "$status" -eq 0 ]
+  [ "$(count_calls resolveReviewThread)" -eq 0 ]
+  [ -z "$(calls_with pulls/comments/)" ]
+}
+
+@test "post.sh reads the thread list from the saved file, and checks each thread again" {
+  set_threads "$(thread "$(as_finding Old)" '[]' false)"
+  write_review '[]'
+  run bash "$ACTION_DIR/scripts/post.sh"
+  [ -z "$(calls_with reviewThreads)" ]
+  [ "$(count_calls PullRequestReviewThread)" -eq 1 ]
+}
+
+@test "a thread that gets a reply during the review is not changed" {
+  export GH_FAIL_RESOLVE=1
+  export GH_THREAD_NOW_JSON='{"data":{"node":{"isResolved":false,"comments":{"totalCount":2}}}}'
+  set_threads "$(thread "$(as_finding Old)" '[]' false)"
+  write_review '[]'
+  run bash "$ACTION_DIR/scripts/post.sh"
+  [ "$status" -eq 0 ]
+  [ "$(count_calls resolveReviewThread)" -eq 0 ]
+  [ -z "$(calls_with pulls/comments/)" ]
+}
+
+@test "if the check of a thread fails, the thread is skipped and the review is posted" {
+  export GH_FAIL_THREAD_NOW=1
+  set_threads "$(thread "$(as_finding Old)" '[]' false)"
+  write_review '[{"path":"app.py","line":2,"body":"New"}]'
+  run bash "$ACTION_DIR/scripts/post.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"::warning::Could not check review thread T_1"* ]]
+  [ "$(count_calls resolveReviewThread)" -eq 0 ]
+  [ "$(count_calls /reviews)" -eq 1 ]
+  [ "$(count_calls --body-file)" -eq 1 ]
+}
+
+@test "a thread that a person resolves during the review is not changed" {
+  export GH_THREAD_NOW_JSON='{"data":{"node":{"isResolved":true,"comments":{"totalCount":1}}}}'
+  set_threads "$(thread "$(as_finding Old)" '[]' false)"
+  write_review '[]'
+  run bash "$ACTION_DIR/scripts/post.sh"
+  [ "$(count_calls resolveReviewThread)" -eq 0 ]
 }
 
 @test "the first run posts the summary comment, with its marker" {

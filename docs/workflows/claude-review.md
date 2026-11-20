@@ -4,9 +4,13 @@ Reusable workflow that reviews a pull request with Claude Code. Claude runs read
 
 It reviews when a pull request is opened, gets new commits or is marked ready for review. To request a review at any other time, including on a draft, add the `claude-review` label; it is removed when the review finishes.
 
-Each run posts its findings as one review, on lines in the diff, and a summary comment at the bottom of the pull request, replacing the previous summary.
+Each run posts its findings as one review, on lines in the diff, and a summary comment at the bottom of the pull request, replacing the previous summary. Findings from earlier runs that nobody replied to are marked **superseded**; resolve them when checked.
 
 How the action works, its security restrictions and its tests: see the action's [README](../../.github/actions/claude-review/README.md).
+
+## Disagreeing with a finding
+
+Reply to the finding to say why, then resolve it or leave it open. Later reviews get your reply and won't raise the finding again, unless the code changes in a way your reply doesn't cover. Only replies from owners, organisation members and collaborators count: anyone can comment on a public pull request.
 
 ## Good to know
 
