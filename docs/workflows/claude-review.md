@@ -46,12 +46,14 @@ permissions: {}
 
 jobs:
   claude:
-    uses: health-informatics-uon/workflows/.github/workflows/claude-review.yml@main
+    uses: health-informatics-uon/workflows/.github/workflows/claude-review.yml@<version>
     permissions:
       contents: read
       pull-requests: write
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
+
+Replace `<version>` with a release tag that includes this workflow (see [pinning](dependabot.md#pinning-strategy)). Do not use `@main`: it changes without review, and this workflow gets your API key.
 
 For on-demand reviews, create the label (`gh label create claude-review`); adding labels needs triage access. Without it, or without `labeled` in the trigger, pull requests are still reviewed automatically.
