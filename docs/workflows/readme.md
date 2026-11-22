@@ -1,5 +1,4 @@
 # Workflow Reference
-
 Documentation for each reusable workflow in this library. These pages cover inputs, outputs, secrets, and usage snippets for individual workflows — use them when you know which workflow you want and need to wire it up.
 
 If you're starting from scratch and want a complete working pipeline, see the [samples](../samples/readme.md) instead.
