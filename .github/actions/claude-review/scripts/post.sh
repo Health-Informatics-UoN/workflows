@@ -153,22 +153,13 @@ body=$(
       else empty end' <<< "$split"
 )
 
+# Old summaries. The bot check keeps comments from people that quote the marker.
+previous=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+  --jq ".[] | select(.user.type == \"Bot\" and (.body | contains(\"$summary_marker\"))) | .id")
+
 # Post the new summary first, so the PR always has a summary if a step fails. Send the
 # body on stdin, not as an argument: a long body can exceed the 128 KiB argument limit.
-# The answer gives the ID of the new comment and the login of the account that posted
-# it: github-actions[bot] for the default token, or the user or app of a custom token.
-# (gh api user does not work with the default token, so the script gets the login here.)
-posted=$(printf '%s' "$body" | jq -Rs '{body: .}' \
-  | gh api --method POST "repos/${REPO}/issues/${PR_NUMBER}/comments" --input - \
-    --jq '{id, login: .user.login}')
-new_id=$(jq -r '.id' <<< "$posted")
-login=$(jq -r '.login' <<< "$posted")
-
-# Old summaries: comments with the marker from the same account, except the new one.
-# The login check keeps comments from people and other bots that quote the marker.
-previous=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
-  --jq ".[] | select(.user.login == \"$login\" and .id != $new_id
-    and (.body | contains(\"$summary_marker\"))) | .id")
+printf '%s' "$body" | gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file -
 
 for id in $previous; do
   gh api -X DELETE "repos/${REPO}/issues/comments/${id}" > /dev/null \
