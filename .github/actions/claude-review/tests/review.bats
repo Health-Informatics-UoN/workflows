@@ -74,16 +74,6 @@ has_arg_pair() {
   grep -qx -- "--bare" "$CLAUDE_ARGS"
 }
 
-@test "output that contains the API key fails the review, is deleted and is not shown" {
-  export ANTHROPIC_API_KEY="sk-ant-test-secret-123"
-  export CLAUDE_OUTPUT='{"is_error":false,"structured_output":{"findings":[{"path":"a","line":1,"body":"key sk-ant-test-secret-123"}],"summary":"x"}}'
-  run bash "$ACTION_DIR/scripts/review.sh"
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"contains the API key"* ]]
-  [[ "$output" != *"sk-ant-test-secret-123"* ]]
-  [ ! -e "$RUNNER_TEMP/review.json" ]
-}
-
 @test "reading is allowed only inside the checkout, with secret locations denied" {
   run bash "$ACTION_DIR/scripts/review.sh"
   has_arg_pair --allowedTools "Read(./**),Grep(./**),Glob(./**)"

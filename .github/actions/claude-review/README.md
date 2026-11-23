@@ -25,7 +25,6 @@ Claude reviews code that anyone with write access can change, so it's restricted
 - **Only the checkout:** the tools are allowed only there. Secret locations (`/proc`, `/etc`, `/tmp`, `$RUNNER_TEMP` and others) are also denied, as a backstop: the API key is readable at `/proc/self/environ`.
 - **Repository config ignored:** `--setting-sources user` ignores `.claude/settings.json`, and `--strict-mcp-config` stops a `.mcp.json` starting MCP servers, which would run with the API key.
 - **No auto-loaded `CLAUDE.md`** (`--bare`): Claude Code doesn't load `CLAUDE.md` files, hooks, plugins or auto memory itself. A `CLAUDE.md` can import files with `@path`, and Claude Code reads those outside the tool rules above. Claude still applies the repository's `CLAUDE.md` or `REVIEW.md` by reading them with the Read tool, as the prompt tells it to.
-- **Key check on the output:** if Claude's output contains the API key as plain text, `review.sh` deletes it and fails, before anything is shown or posted. This doesn't depend on the other restrictions, but it doesn't find an encoded key.
 - **No GitHub token:** the workflow's checkout doesn't keep it (`persist-credentials: false`, not tested), and `gh` runs only before and after Claude.
 - **No comments:** anyone can comment on a public PR, so comments could carry instructions meant to mislead the review.
 - **Output is data:** `post.sh` passes Claude's output to `gh` as fields or on stdin, never in a shell command.

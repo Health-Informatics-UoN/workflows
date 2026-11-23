@@ -82,15 +82,6 @@ deny=${deny%,}  # Remove the last comma.
   --disallowedTools "$deny" \
   > "$out" || true
 
-# A last barrier, which does not depend on the restrictions above: if the API key is in
-# the output, stop before this script shows the output and before post.sh posts it.
-# This finds the key as plain text only, not encoded (for example, as base64).
-if grep -qF -- "$ANTHROPIC_API_KEY" "$out"; then
-  rm -f "$out"
-  echo "::error::The Claude output contains the API key. Nothing is posted. Rotate the key."
-  exit 1
-fi
-
 # For some failures (for example, no credit), Claude Code prints plain text, not JSON.
 # Show that text as the error. If not, a jq error that is not clear occurs later.
 if ! jq -e 'type == "object"' "$out" > /dev/null 2>&1; then
