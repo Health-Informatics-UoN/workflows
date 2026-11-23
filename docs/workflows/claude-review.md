@@ -2,7 +2,7 @@
 
 Reusable workflow that reviews a pull request with Claude Code. Claude runs read-only: it can read the checked-out code, but has no shell and no GitHub token.
 
-It reviews when a pull request is opened, gets new commits or is marked ready for review. To request a review at any other time, including on a draft, add the `claude-review` label; it is removed when the review finishes.
+It reviews when a pull request is opened, gets new commits or is marked ready for review. To request a review at any other time, including on a draft, add the `claude-review` label to the open pull request; it is removed when the review finishes. The label does nothing on a closed pull request.
 
 Each run posts its findings as one review, on lines in the diff, and a summary comment at the bottom of the pull request, replacing the previous summary.
 

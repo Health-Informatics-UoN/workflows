@@ -3,8 +3,9 @@
 #
 # The workflow does a review when a PR opens, gets new commits or becomes ready for
 # review, or when a person adds the review label (default `claude-review`). The label
-# requests a review at any time, also on a draft PR. It is removed after the review, so
-# that you can add it again. The caller trigger must include the `labeled` type.
+# requests a review at any time on an open PR, also on a draft, but not on a closed
+# PR. It is removed after the review, so that you can add it again. The caller trigger
+# must include the `labeled` type.
 name: Claude PR Review
 
 on:
@@ -50,6 +51,7 @@ jobs:
       github.event.pull_request.user.login != 'dependabot[bot]' &&
       (github.event.action == 'labeled'
         && github.event.label.name == inputs.label
+        && github.event.pull_request.state == 'open'
         || github.event.action != 'labeled'
         && !github.event.pull_request.draft)
     runs-on: ubuntu-latest
