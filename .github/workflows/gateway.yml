@@ -12,9 +12,9 @@ on:
         type: boolean
         default: false
       version:
-        description: Metadata version, major.minor.patch (a leading v is removed). Pass the release tag.
+        description: Metadata version, major.minor.patch (a leading v is removed). Pass the release tag; required to publish.
         type: string
-        default: "0.0.0"
+        default: ""
       dataset-dir:
         description: Directory holding gateway/.
         type: string

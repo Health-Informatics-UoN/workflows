@@ -59,7 +59,7 @@ The metadata combines the LinkML schema (tables, columns and permitted values) w
 | Input | Default | Description |
 |---|---|---|
 | `publish` | `false` | Publish after validating. |
-| `version` | `0.0.0` | Metadata version, `major.minor.patch`; a leading `v` is removed. Pass the release tag. |
+| `version` | — | Metadata version, `major.minor.patch`; a leading `v` is removed. Pass the release tag; required to publish. |
 | `dataset-dir` | `.` | Directory holding `gateway/`. |
 | `schema` | the only `*.yaml` in `dataset-dir`, else in `dataset-dir/schemas` | LinkML schema. |
 | `status` | `status` in `gateway.yaml` | `DRAFT` or `ACTIVE`. |

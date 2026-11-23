@@ -87,6 +87,7 @@ def structural_metadata(schema: Path) -> dict:
                 "name": slot.name,
                 "dataType": "string" if enum else slot.range or "string",
                 "description": (slot.description or "").strip() or None,  # HDRUK rejects ""
+                # Our LinkML schemas mark sensitive slots with a `sensitivity` annotation.
                 "sensitive": "sensitivity" in slot.annotations,
             }
             if enum:
@@ -132,6 +133,7 @@ def build(root: Path, schema: Path | None, version: str, now: datetime | None = 
     stamp = (now or datetime.now(UTC)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
     summary = metadata.get("summary", {})
     return {
+        # The Gateway sets its own pid as the identifier; null is valid before create.
         "identifier": gateway.get("pid"),
         "version": version,
         "revisions": [],
@@ -147,14 +149,19 @@ def build(root: Path, schema: Path | None, version: str, now: datetime | None = 
 
 def traser_check(payload: dict, traser_url: str) -> None:
     """Make the call the Gateway makes for ACTIVE datasets; raise with TRASER's errors."""
-    with httpx.Client(base_url=traser_url, timeout=120, transport=transport) as client:
-        response = client.post("/translate", params={
-            "input_schema": SCHEMA[0], "input_version": SCHEMA[1], "output_schema": "GWDM",
-            "output_version": GWDM_VERSION, "validate_input": "1", "validate_output": "1",
-        }, json={"metadata": payload, "extra": {
-            "id": "placeholder", "pid": "placeholder", "datasetType": "Health and disease",
-            "publisherId": "placeholder", "publisherName": "placeholder",
-        }})
+    try:
+        with httpx.Client(base_url=traser_url, timeout=120, transport=transport) as client:
+            response = client.post("/translate", params={
+                "input_schema": SCHEMA[0], "input_version": SCHEMA[1], "output_schema": "GWDM",
+                "output_version": GWDM_VERSION, "validate_input": "1", "validate_output": "1",
+            }, json={"metadata": payload, "extra": {
+                # The Gateway adds this block for GWDM's required fields; the values don't
+                # affect validation.
+                "id": "placeholder", "pid": "placeholder", "datasetType": "Health and disease",
+                "publisherId": "placeholder", "publisherName": "placeholder",
+            }})
+    except httpx.HTTPError as e:
+        raise Error(f"Could not reach TRASER at {traser_url}: {e}") from None
     if response.is_success:
         return
     try:
@@ -181,7 +188,13 @@ def gateway_client(gateway_url: str) -> httpx.Client:
 
 
 def call(client: httpx.Client, method: str, path: str, **kwargs) -> dict:
-    response = client.request(method, path, **kwargs)
+    try:
+        response = client.request(method, path, **kwargs)
+    except httpx.HTTPError as e:
+        message = f"Gateway {method} {path} failed: {e}"
+        if method != "GET":
+            message += ". The change may still have been applied: check the dataset on the Gateway before re-running."
+        raise Error(message) from None
     if not response.is_success:
         try:
             message = response.json().get("message")
@@ -214,60 +227,73 @@ def record_created(path: Path, dataset_id: int, pid: str | None) -> None:
     path.write_text(text)
 
 
+def validate(args: argparse.Namespace) -> tuple[dict, dict]:
+    """Build the payload and check it with TRASER. Returns (payload, gateway.yaml)."""
+    payload, gateway = build(args.dataset, args.schema, args.version or "0.0.0")
+    if args.skip_traser:
+        print("Built; TRASER check skipped")
+    else:
+        traser_check(payload, args.traser_url)
+        print(f"Valid {SCHEMA[0]} {SCHEMA[1]}; translates to GWDM {GWDM_VERSION} (TRASER)")
+    return payload, gateway
+
+
+def create(args: argparse.Namespace) -> None:
+    """Create the dataset on the Gateway, once, and record its ID in gateway.yaml."""
+    payload, gateway = validate(args)
+    if gateway.get("dataset_id"):
+        raise Error(f"gateway.yaml already has dataset_id {gateway['dataset_id']}; use push")
+    status = args.status or gateway.get("status") or "DRAFT"
+    datasets = f"/v2/teams/{gateway['team_id']}/datasets"
+    gateway_yaml = args.dataset / "gateway" / "gateway.yaml"
+    with gateway_client(args.gateway_url) as client:
+        dataset_id = call(client, "POST", datasets, json=body(payload, status),
+                          params={"input_schema": SCHEMA[0], "input_version": SCHEMA[1]})["data"]
+        record_created(gateway_yaml, dataset_id, None)  # save the ID first, so it is never lost
+        pid = call(client, "GET", f"{datasets}/{dataset_id}")["data"].get("pid")
+    record_created(gateway_yaml, dataset_id, pid)
+    print(f"Created {status} dataset {dataset_id}; commit gateway/gateway.yaml")
+
+
+def push(args: argparse.Namespace) -> None:
+    """Send the payload as a new version of the dataset, then check it arrived."""
+    payload, gateway = validate(args)
+    dataset_id = gateway.get("dataset_id")
+    if not dataset_id:
+        raise Error("gateway.yaml has no dataset_id: run `create` once and commit gateway.yaml")
+    status = args.status or gateway.get("status") or "DRAFT"
+    team = gateway["team_id"]
+    if args.dry_run:
+        print(f"DRY RUN: PUT {args.gateway_url}/v3/teams/{team}/datasets/{dataset_id}")
+        print(json.dumps(body(payload, status), indent=2, ensure_ascii=False))
+        return
+    with gateway_client(args.gateway_url) as client:
+        before, _ = latest(client, team, dataset_id)
+        # Not retried: a retry could add a second version.
+        call(client, "PUT", f"/v3/teams/{team}/datasets/{dataset_id}", json=body(payload, status))
+        after, title = latest(client, team, dataset_id)
+    print(f"Dataset {dataset_id}: version {before} -> {after}, status {status}")
+    if after <= before or title != payload["summary"]["title"]:
+        raise Error(f"Read-back check failed: version {after}, title {title!r}")
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("command", choices=("validate", "create", "push"))
     parser.add_argument("dataset", type=Path, help="dataset directory (holds gateway/)")
     parser.add_argument("--schema", type=Path, help="LinkML schema (default: the only *.yaml in DIR, else DIR/schemas)")
-    parser.add_argument("--version", default="0.0.0", help="metadata version, major.minor.patch")
+    parser.add_argument("--version", help="metadata version, major.minor.patch; required for create and push")
     parser.add_argument("--status", choices=STATUSES, help="default: gateway.yaml's status, else DRAFT")
     parser.add_argument("--dry-run", action="store_true", help="push: print the request instead of sending it")
     parser.add_argument("--gateway-url", required=True, help="Gateway API base URL, e.g. https://api.healthdatagateway.org/api")
     parser.add_argument("--traser-url", required=True, help="TRASER base URL")
     parser.add_argument("--skip-traser", action="store_true")
     args = parser.parse_args(argv)
+    if args.command != "validate" and not args.version:
+        parser.error(f"--version is required for {args.command}")
 
     try:
-        payload, gateway = build(args.dataset, args.schema, args.version)
-        if args.skip_traser:
-            print("Built; TRASER check skipped")
-        else:
-            traser_check(payload, args.traser_url)
-            print(f"Valid {SCHEMA[0]} {SCHEMA[1]}; translates to GWDM {GWDM_VERSION} (TRASER)")
-        if args.command == "validate":
-            return
-
-        status = args.status or gateway.get("status") or "DRAFT"
-        team = gateway["team_id"]
-        datasets = f"/v2/teams/{team}/datasets"
-
-        if args.command == "create":
-            if gateway.get("dataset_id"):
-                raise Error(f"gateway.yaml already has dataset_id {gateway['dataset_id']}; use push")
-            with gateway_client(args.gateway_url) as client:
-                dataset_id = call(client, "POST", datasets, json=body(payload, status),
-                                  params={"input_schema": SCHEMA[0], "input_version": SCHEMA[1]})["data"]
-                record_created(args.dataset / "gateway" / "gateway.yaml", dataset_id, None)  # never lose the ID
-                pid = call(client, "GET", f"{datasets}/{dataset_id}")["data"].get("pid")
-            record_created(args.dataset / "gateway" / "gateway.yaml", dataset_id, pid)
-            print(f"Created {status} dataset {dataset_id}; commit gateway/gateway.yaml")
-            return
-
-        dataset_id = gateway.get("dataset_id")
-        if not dataset_id:
-            raise Error("gateway.yaml has no dataset_id: run `create` once and commit gateway.yaml")
-        if args.dry_run:
-            print(f"DRY RUN: PUT {args.gateway_url}/v3/teams/{team}/datasets/{dataset_id}")
-            print(json.dumps(body(payload, status), indent=2, ensure_ascii=False))
-            return
-        with gateway_client(args.gateway_url) as client:
-            before, _ = latest(client, team, dataset_id)
-            # Not retried: a retry could add a second version.
-            call(client, "PUT", f"/v3/teams/{team}/datasets/{dataset_id}", json=body(payload, status))
-            after, title = latest(client, team, dataset_id)
-        print(f"Dataset {dataset_id}: version {before} -> {after}, status {status}")
-        if after <= before or title != payload["summary"]["title"]:
-            raise Error(f"Read-back check failed: version {after}, title {title!r}")
+        {"validate": validate, "create": create, "push": push}[args.command](args)
     except Error as e:
         print(f"error: {e}", file=sys.stderr)
         sys.exit(1)

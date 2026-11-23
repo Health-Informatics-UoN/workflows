@@ -15,8 +15,8 @@ inputs:
     description: LinkML schema. Default the only *.yaml in dataset-dir, else in dataset-dir/schemas.
     default: ""
   version:
-    description: Metadata version, major.minor.patch (a leading v is removed).
-    default: "0.0.0"
+    description: Metadata version, major.minor.patch (a leading v is removed). Required for push.
+    default: ""
   status:
     description: DRAFT or ACTIVE. Default the status in gateway.yaml.
     default: ""
@@ -62,7 +62,8 @@ runs:
         GATEWAY_APP_ID: ${{ inputs.app-id }}
         GATEWAY_CLIENT_ID: ${{ inputs.client-id }}
       run: |
-        args=("$COMMAND" "$DATASET_DIR" --version "$VERSION" --gateway-url "$GATEWAY_URL" --traser-url "$TRASER_URL")
+        args=("$COMMAND" "$DATASET_DIR" --gateway-url "$GATEWAY_URL" --traser-url "$TRASER_URL")
+        if [ -n "$VERSION" ]; then args+=(--version "$VERSION"); fi
         if [ -n "$SCHEMA" ]; then args+=(--schema "$SCHEMA"); fi
         if [ -n "$STATUS" ]; then args+=(--status "$STATUS"); fi
         if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
