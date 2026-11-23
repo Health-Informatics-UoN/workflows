@@ -206,7 +206,6 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
-    { name = "jsonschema" },
     { name = "linkml-runtime" },
     { name = "pydantic" },
     { name = "pyyaml" },
@@ -220,7 +219,6 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.28" },
-    { name = "jsonschema", specifier = ">=4.23" },
     { name = "linkml-runtime", specifier = ">=1.12.1" },
     { name = "pydantic", specifier = ">=2" },
     { name = "pyyaml", specifier = ">=6.0.3" },

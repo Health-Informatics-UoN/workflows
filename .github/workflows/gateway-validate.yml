@@ -2,10 +2,9 @@
 # pull requests (see samples/check.gateway.yaml). It needs no secrets, so it is safe for
 # PRs from forks and Dependabot.
 #
-# It builds the metadata from the LinkML schema and gateway/metadata.yaml, validates it
-# against the HDRUK 4.1.0 schema, and (by default) sends it to HDR UK's TRASER service,
-# which the Gateway uses and which catches errors the schema alone misses. TRASER receives
-# the metadata, which is published anyway.
+# It builds the metadata from the LinkML schema and gateway/metadata.yaml, then validates it
+# with HDR UK's TRASER service, the way the Gateway does: against HDRUK 4.1.0, then
+# translated to GWDM.
 name: HDR UK Gateway Validate
 
 on:
@@ -20,7 +19,7 @@ on:
         type: string
         default: ""
       traser:
-        description: Also check the metadata with TRASER, as the Gateway does.
+        description: Validate with TRASER, as the Gateway does. false skips validation.
         type: boolean
         default: true
       traser-url:

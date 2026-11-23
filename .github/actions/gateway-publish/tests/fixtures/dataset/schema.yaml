@@ -1,0 +1,43 @@
+# A small LinkML schema covering each mapping case in build.structural_metadata.
+id: https://example.org/test-dataset
+name: test_dataset
+imports:
+  - linkml:types
+prefixes:
+  linkml: https://w3id.org/linkml/
+default_range: string
+
+classes:
+  Visit:
+    description: One row per hospital visit.
+    tree_root: true
+    slots: [visit_id, pseudo_nhs_number, visit_date, outcome, note]
+  NotPublished:
+    description: Not a tree_root, so not a table.
+    slots: [visit_id]
+
+slots:
+  visit_id:
+    description: Visit identifier.
+    range: integer
+  pseudo_nhs_number:
+    description: Pseudonymised NHS number.
+    annotations:
+      sensitivity: pseudonymised
+  visit_date:
+    description: Date of the visit.
+    range: date
+  outcome:
+    description: How the visit ended.
+    range: Outcome
+  note:
+    description: ""
+
+enums:
+  Outcome:
+    permissible_values:
+      "01":
+        description: Discharged
+      "02":
+        description: Admitted
+      "99": {}

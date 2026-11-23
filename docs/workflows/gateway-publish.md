@@ -2,7 +2,7 @@
 
 Two reusable workflows that publish a dataset's metadata to the [HDR UK Health Data Research Gateway](https://healthdatagateway.org) from a LinkML repo:
 
-- `gateway-validate.yml` builds and validates the metadata. Run it on pull requests. It needs no secrets.
+- `gateway-validate.yml` builds the metadata and validates it with HDR UK's TRASER service, as the Gateway does. Run it on pull requests. It needs no secrets.
 - `gateway-publish.yml` validates, then sends the metadata to the Gateway as a new version of an existing dataset. Run it after `semantic-release` creates a release.
 
 Both run the [gateway-publish action](../../.github/actions/gateway-publish/README.md). It combines:
@@ -30,7 +30,7 @@ Both run the [gateway-publish action](../../.github/actions/gateway-publish/READ
    ```sh
    export GATEWAY_APP_ID=... GATEWAY_CLIENT_ID=...   # don't put these in shell history or files in the repo
    uv run --project <workflows checkout>/.github/actions/gateway-publish \
-     gateway-publish create --dataset . --version 0.0.0
+     gateway-publish create . --version 0.0.0
    ```
 
 6. **Add the publish job** to the release workflow ([sample](../../samples/release.gateway.yaml)).
@@ -43,7 +43,7 @@ The workflows never create datasets and never write to the repository. If `gatew
 |---|---|---|---|
 | `dataset-dir` | No | `.` | Directory holding `gateway/`. |
 | `schema` | No | the only `*.yaml` in `dataset-dir`, else in `dataset-dir/schemas` | LinkML schema. |
-| `traser` | No | `true` | Also check with HDR UK's TRASER service, as the Gateway does. It catches errors that schema validation misses. |
+| `traser` | No | `true` | Validate with HDR UK's TRASER service, as the Gateway does: against HDRUK 4.1.0, then translated to GWDM. This is the only validation. |
 | `traser-url` | No | HDR UK's dev TRASER | TRASER base URL. |
 
 ## `gateway-publish.yml`

@@ -2,7 +2,7 @@
 
 Authenticates with a Private App's x-application-id / x-client-id headers. Updates go to
 v3, because the v2 PUT overwrites the latest version in place instead of adding one. The
-older /api/v1/integrations/datasets endpoints have been retired. See docs/gateway-notes.md.
+older /api/v1/integrations/datasets endpoints have been retired. See the README.
 """
 
 import json
@@ -41,7 +41,7 @@ class GatewayError(Exception):
 # substring matches any message for that status.
 ERROR_HINTS: list[tuple[int, str | None, str]] = [
     (400, "permissions do not allow", "the Private App lacks the permission for this action "
-        "(datasets.create / datasets.update / datasets.delete). Fix on the app's Permissions tab."),
+        "(datasets.create / datasets.update). Fix on the app's Permissions tab."),
     (400, "not been enabled", "the Private App is disabled. Set it to Enabled on the App Info tab."),
     (400, "unknown format", "the metadata matched no supported schema. Run `gateway-publish validate` "
         "and see the TRASER details in the response."),
@@ -52,8 +52,7 @@ ERROR_HINTS: list[tuple[int, str | None, str]] = [
     (401, "another team", "the app belongs to a different team from GATEWAY_TEAM_ID or from the dataset."),
     (401, None, "credentials missing, wrong, or not valid for this team."),
     (404, None, "no dataset with that ID in this team (wrong ID or team, or it was deleted)."),
-    (410, None, "this endpoint has been retired by the Gateway."),
-    (500, None, "server error. For update/delete this can also mean the dataset ID does not exist."),
+    (500, None, "server error. For an update this can also mean the dataset ID does not exist."),
 ]
 
 
@@ -173,20 +172,6 @@ class GatewayClient:
             raise ValueError("schema_model and schema_version must be given together")
         params = {"schema_model": schema_model, "schema_version": schema_version} if schema_model else None
         response = self._read(f"{self._datasets_path()}/{dataset_id}", params=params)
-        _raise_for_status(response)
-        return response.json()
-
-    def delete(self, dataset_id: int) -> dict[str, Any]:
-        response = self._http.delete(f"{self._datasets_path()}/{dataset_id}")
-        _raise_for_status(response)
-        return response.json()
-
-    def list(self, status: str = "active", title: str | None = None) -> dict[str, Any]:
-        """List the team's datasets. `title` is a substring match on the Gateway side."""
-        params: dict[str, Any] = {"with_metadata": "false"}
-        if title:
-            params["title"] = title
-        response = self._read(f"{self._datasets_path()}/status/{status}", params=params)
         _raise_for_status(response)
         return response.json()
 

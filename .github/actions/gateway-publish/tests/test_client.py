@@ -80,16 +80,6 @@ def test_get_requires_both_schema_params(config, model, version):
     assert recorder.requests == []
 
 
-def test_delete_and_list(config):
-    recorder = Recorder()
-    client = make_client(config, recorder)
-    client.delete(9)
-    assert (recorder.last.method, recorder.last.url.path) == ("DELETE", "/api/v2/teams/42/datasets/9")
-    client.list(title="SACT")
-    assert recorder.last.url.path == "/api/v2/teams/42/datasets/status/active"
-    assert recorder.last.url.params["title"] == "SACT"
-
-
 @pytest.mark.parametrize(
     "status,message,hint_fragment",
     [
@@ -101,7 +91,6 @@ def test_delete_and_list(config):
         (401, "This Application is not allowed to interact with datasets from another team!", "GATEWAY_TEAM_ID"),
         (401, "Unauthorized", "credentials"),
         (404, "Dataset not found", "no dataset with that ID"),
-        (410, "This endpoint has been retired.", "retired"),
         (500, "Dataset with id=1 cannot be found", "server error"),
         (503, "Service Unavailable", "retrying later"),
     ],

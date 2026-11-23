@@ -1,11 +1,7 @@
-import json
-from pathlib import Path
-
 import pytest
 
 from gateway_publish.config import GatewayConfig
 
-FIXTURES = Path(__file__).parent / "fixtures"
 APP_ID = "test-app-id-0123456789"
 CLIENT_ID = "test-client-id-9876543210"
 TEAM_ID = 42
@@ -27,7 +23,7 @@ def config(gateway_env) -> GatewayConfig:
 
 @pytest.fixture
 def example_metadata() -> dict:
-    return json.loads((FIXTURES / "example-hdruk410.json").read_text())
+    return {"summary": {"title": "Example"}}
 
 
 @pytest.fixture(autouse=True)

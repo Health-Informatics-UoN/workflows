@@ -17,9 +17,9 @@ set -euo pipefail
 args=()
 case "$COMMAND" in
   validate)
-    args=(validate --dataset "$DATASET_DIR")
+    args=(validate "$DATASET_DIR")
     if [ -n "$VERSION" ]; then args+=(--version "$VERSION"); fi
-    if [ "$TRASER" = "true" ]; then args+=(--traser); fi
+    if [ "$TRASER" != "true" ]; then args+=(--skip-traser); fi
     ;;
   push)
     if [ -z "$VERSION" ]; then

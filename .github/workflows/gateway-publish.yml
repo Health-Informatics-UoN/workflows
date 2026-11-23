@@ -51,7 +51,7 @@ on:
         type: string
         default: ""
       traser:
-        description: Also check the metadata with TRASER, as the Gateway does.
+        description: Validate with TRASER, as the Gateway does. false skips validation.
         type: boolean
         default: true
       traser-url:
