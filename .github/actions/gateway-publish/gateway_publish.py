@@ -37,8 +37,6 @@ from linkml_runtime.utils.schemaview import SchemaView
 
 SCHEMA = ("HDRUK", "4.1.0")
 GWDM_VERSION = "2.2"  # what the live Gateway stores
-GATEWAY_URL = "https://api.healthdatagateway.org/api"
-TRASER_URL = "https://hdr-gateway-traser-dev-qmnkcg5qjq-ew.a.run.app"
 STATUSES = ("DRAFT", "ACTIVE")
 # Filled by build; metadata.yaml must not set them.
 GENERATED = ("identifier", "version", "issued", "modified", "revisions", "structuralMetadata")
@@ -147,9 +145,9 @@ def build(root: Path, schema: Path | None, version: str, now: datetime | None = 
     }, gateway
 
 
-def traser_check(payload: dict) -> None:
+def traser_check(payload: dict, traser_url: str) -> None:
     """Make the call the Gateway makes for ACTIVE datasets; raise with TRASER's errors."""
-    with httpx.Client(base_url=os.environ.get("TRASER_URL") or TRASER_URL, timeout=120, transport=transport) as client:
+    with httpx.Client(base_url=traser_url, timeout=120, transport=transport) as client:
         response = client.post("/translate", params={
             "input_schema": SCHEMA[0], "input_version": SCHEMA[1], "output_schema": "GWDM",
             "output_version": GWDM_VERSION, "validate_input": "1", "validate_output": "1",
@@ -170,12 +168,12 @@ def traser_check(payload: dict) -> None:
     raise Error("\n".join([f"TRASER rejected the metadata (HTTP {response.status_code}): {body.get('message')}", *lines]))
 
 
-def gateway_client() -> httpx.Client:
+def gateway_client(gateway_url: str) -> httpx.Client:
     missing = [n for n in ("GATEWAY_APP_ID", "GATEWAY_CLIENT_ID") if not os.environ.get(n)]
     if missing:
         raise Error(f"Missing environment variable(s): {', '.join(missing)}")
     return httpx.Client(
-        base_url=(os.environ.get("GATEWAY_BASE_URL") or GATEWAY_URL).rstrip("/"),
+        base_url=gateway_url,
         headers={"x-application-id": os.environ["GATEWAY_APP_ID"], "x-client-id": os.environ["GATEWAY_CLIENT_ID"]},
         timeout=TIMEOUT,
         transport=transport,
@@ -224,6 +222,8 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--version", default="0.0.0", help="metadata version, major.minor.patch")
     parser.add_argument("--status", choices=STATUSES, help="default: gateway.yaml's status, else DRAFT")
     parser.add_argument("--dry-run", action="store_true", help="push: print the request instead of sending it")
+    parser.add_argument("--gateway-url", required=True, help="Gateway API base URL, e.g. https://api.healthdatagateway.org/api")
+    parser.add_argument("--traser-url", required=True, help="TRASER base URL")
     parser.add_argument("--skip-traser", action="store_true")
     args = parser.parse_args(argv)
 
@@ -232,21 +232,19 @@ def main(argv: list[str] | None = None) -> None:
         if args.skip_traser:
             print("Built; TRASER check skipped")
         else:
-            traser_check(payload)
+            traser_check(payload, args.traser_url)
             print(f"Valid {SCHEMA[0]} {SCHEMA[1]}; translates to GWDM {GWDM_VERSION} (TRASER)")
         if args.command == "validate":
             return
 
         status = args.status or gateway.get("status") or "DRAFT"
-        team = int(os.environ.get("GATEWAY_TEAM_ID") or gateway["team_id"])
-        if team != gateway["team_id"]:
-            raise Error(f"gateway.yaml is for team {gateway['team_id']}, but GATEWAY_TEAM_ID is {team}")
+        team = gateway["team_id"]
         datasets = f"/v2/teams/{team}/datasets"
 
         if args.command == "create":
             if gateway.get("dataset_id"):
                 raise Error(f"gateway.yaml already has dataset_id {gateway['dataset_id']}; use push")
-            with gateway_client() as client:
+            with gateway_client(args.gateway_url) as client:
                 dataset_id = call(client, "POST", datasets, json=body(payload, status),
                                   params={"input_schema": SCHEMA[0], "input_version": SCHEMA[1]})["data"]
                 record_created(args.dataset / "gateway" / "gateway.yaml", dataset_id, None)  # never lose the ID
@@ -259,10 +257,10 @@ def main(argv: list[str] | None = None) -> None:
         if not dataset_id:
             raise Error("gateway.yaml has no dataset_id: run `create` once and commit gateway.yaml")
         if args.dry_run:
-            print(f"DRY RUN: PUT /v3/teams/{team}/datasets/{dataset_id}")
+            print(f"DRY RUN: PUT {args.gateway_url}/v3/teams/{team}/datasets/{dataset_id}")
             print(json.dumps(body(payload, status), indent=2, ensure_ascii=False))
             return
-        with gateway_client() as client:
+        with gateway_client(args.gateway_url) as client:
             before, _ = latest(client, team, dataset_id)
             # Not retried: a retry could add a second version.
             call(client, "PUT", f"/v3/teams/{team}/datasets/{dataset_id}", json=body(payload, status))

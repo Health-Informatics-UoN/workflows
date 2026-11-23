@@ -27,14 +27,11 @@ inputs:
     description: Validate with TRASER. false skips validation.
     default: "true"
   traser-url:
-    description: TRASER base URL. Default HDR UK's dev instance.
-    default: ""
+    description: TRASER base URL.
+    required: true
   base-url:
     description: Gateway API base URL.
-    default: https://api.healthdatagateway.org/api
-  team-id:
-    description: Gateway team ID. Default team_id in gateway.yaml; if set, it must match.
-    default: ""
+    required: true
   app-id:
     description: The Private App's App ID (push only).
     default: ""
@@ -61,12 +58,11 @@ runs:
         DRY_RUN: ${{ inputs.dry-run }}
         TRASER: ${{ inputs.traser }}
         TRASER_URL: ${{ inputs.traser-url }}
-        GATEWAY_BASE_URL: ${{ inputs.base-url }}
-        GATEWAY_TEAM_ID: ${{ inputs.team-id }}
+        GATEWAY_URL: ${{ inputs.base-url }}
         GATEWAY_APP_ID: ${{ inputs.app-id }}
         GATEWAY_CLIENT_ID: ${{ inputs.client-id }}
       run: |
-        args=("$COMMAND" "$DATASET_DIR" --version "$VERSION")
+        args=("$COMMAND" "$DATASET_DIR" --version "$VERSION" --gateway-url "$GATEWAY_URL" --traser-url "$TRASER_URL")
         if [ -n "$SCHEMA" ]; then args+=(--schema "$SCHEMA"); fi
         if [ -n "$STATUS" ]; then args+=(--status "$STATUS"); fi
         if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi

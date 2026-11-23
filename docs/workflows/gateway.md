@@ -23,7 +23,9 @@ The metadata combines the LinkML schema (tables, columns and permitted values) w
    ```sh
    A=<workflows checkout>/.github/actions/gateway-publish
    GATEWAY_APP_ID=... GATEWAY_CLIENT_ID=... \
-     uv run --frozen --project "$A" python "$A/gateway_publish.py" create . --version 0.0.0
+     uv run --frozen --project "$A" python "$A/gateway_publish.py" create . --version 0.0.0 \
+       --gateway-url https://api.healthdatagateway.org/api \
+       --traser-url https://hdr-gateway-traser-dev-qmnkcg5qjq-ew.a.run.app
    ```
 
 5. **Call the workflow** on PRs and after releases:
@@ -64,9 +66,8 @@ The metadata combines the LinkML schema (tables, columns and permitted values) w
 | `dry-run` | `false` | Print the publish request instead of sending it. |
 | `environment` | `gateway` | GitHub environment for the publish job. |
 | `base-url` | `https://api.healthdatagateway.org/api` | Gateway API base URL. |
-| `team-id` | `team_id` in `gateway.yaml` | Gateway team; if set, it must match `gateway.yaml`. |
 | `traser` | `true` | Validate with TRASER; `false` skips validation. |
-| `traser-url` | HDR UK's dev TRASER | TRASER base URL. |
+| `traser-url` | `https://hdr-gateway-traser-dev-qmnkcg5qjq-ew.a.run.app` (HDR UK's dev instance) | TRASER base URL. |
 
 Secrets `GATEWAY_APP_ID` and `GATEWAY_CLIENT_ID` are needed only to publish. With `secrets: inherit`, the publish job uses the environment's secrets; you can pass repository secrets by name instead.
 

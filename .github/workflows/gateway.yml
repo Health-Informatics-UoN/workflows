@@ -39,18 +39,14 @@ on:
         description: Gateway API base URL.
         type: string
         default: https://api.healthdatagateway.org/api
-      team-id:
-        description: Gateway team ID. Default team_id in gateway.yaml; if set, it must match.
-        type: string
-        default: ""
       traser:
         description: Validate with TRASER. false skips validation.
         type: boolean
         default: true
       traser-url:
-        description: TRASER base URL. Default HDR UK's dev instance.
+        description: TRASER base URL.
         type: string
-        default: ""
+        default: https://hdr-gateway-traser-dev-qmnkcg5qjq-ew.a.run.app
     secrets:
       # Optional so PR checks and dry runs work without them. With `secrets: inherit` the
       # publish job uses the environment's secrets of these names.
@@ -80,6 +76,7 @@ jobs:
           dataset-dir: ${{ inputs.dataset-dir }}
           schema: ${{ inputs.schema }}
           version: ${{ inputs.version }}
+          base-url: ${{ inputs.base-url }}
           traser: ${{ inputs.traser }}
           traser-url: ${{ inputs.traser-url }}
 
@@ -108,7 +105,6 @@ jobs:
           status: ${{ inputs.status }}
           dry-run: ${{ inputs.dry-run }}
           base-url: ${{ inputs.base-url }}
-          team-id: ${{ inputs.team-id }}
           traser: ${{ inputs.traser }}
           traser-url: ${{ inputs.traser-url }}
           app-id: ${{ secrets.GATEWAY_APP_ID }}

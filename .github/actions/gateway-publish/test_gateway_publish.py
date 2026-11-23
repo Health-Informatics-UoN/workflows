@@ -40,6 +40,8 @@ provenance:
     startDate: 2009-01-01
 """
 
+URLS = ["--gateway-url", "https://gateway.test/api", "--traser-url", "https://traser.test"]
+
 GATEWAY = """# comment kept
 team_id: 74
 team_name: NUH
@@ -58,7 +60,6 @@ def dataset(tmp_path, monkeypatch):
     (tmp_path / "gateway" / "gateway.yaml").write_text(GATEWAY)
     monkeypatch.setenv("GATEWAY_APP_ID", "app-secret")
     monkeypatch.setenv("GATEWAY_CLIENT_ID", "client-secret")
-    monkeypatch.delenv("GATEWAY_TEAM_ID", raising=False)
     return tmp_path
 
 
@@ -116,15 +117,15 @@ def test_build_errors(dataset, metadata, version, error):
 
 
 def test_create_then_push(dataset, gateway, capsys):
-    gp.main(["create", str(dataset), "--version", "1.0.0"])
+    gp.main(["create", str(dataset), "--version", "1.0.0", *URLS])
     gateway_yaml = (dataset / "gateway" / "gateway.yaml").read_text()
     assert "# comment kept" in gateway_yaml and "dataset_id: 2080" in gateway_yaml and "pid: pid-1" in gateway_yaml
     post = next(r for r in gateway.requests if r.method == "POST" and r.url.path != "/translate")
-    assert post.url.path == "/api/v2/teams/74/datasets"
+    assert str(post.url).startswith("https://gateway.test/api/v2/teams/74/datasets")
     assert post.headers["x-application-id"] == "app-secret"
     assert json.loads(post.content)["status"] == "DRAFT"
 
-    gp.main(["push", str(dataset), "--version", "1.1.0", "--status", "ACTIVE"])
+    gp.main(["push", str(dataset), "--version", "1.1.0", "--status", "ACTIVE", *URLS])
     put = next(r for r in gateway.requests if r.method == "PUT")
     assert put.url.path == "/api/v3/teams/74/datasets/2080"
     body = json.loads(put.content)
@@ -138,20 +139,20 @@ def test_create_then_push(dataset, gateway, capsys):
 def test_traser_rejection_stops_push(dataset, gateway, capsys):
     gateway.traser_status = 400
     with pytest.raises(SystemExit):
-        gp.main(["create", str(dataset), "--version", "1.0.0"])
+        gp.main(["create", str(dataset), "--version", "1.0.0", *URLS])
     assert "/summary: bad" in capsys.readouterr().err
-    assert all(r.url.path == "/translate" for r in gateway.requests)
+    assert all(r.url.host == "traser.test" for r in gateway.requests)
 
 
 def test_push_needs_dataset_id(dataset, gateway, capsys):
     with pytest.raises(SystemExit):
-        gp.main(["push", str(dataset), "--version", "1.0.0"])
+        gp.main(["push", str(dataset), "--version", "1.0.0", *URLS])
     assert "run `create` once" in capsys.readouterr().err
 
 
 def test_dry_run_sends_nothing(dataset, gateway, monkeypatch, capsys):
     monkeypatch.delenv("GATEWAY_APP_ID")
     (dataset / "gateway" / "gateway.yaml").write_text(GATEWAY.replace("dataset_id: null", "dataset_id: 5"))
-    gp.main(["push", str(dataset), "--version", "2.0.0", "--dry-run", "--skip-traser"])
-    assert "PUT /v3/teams/74/datasets/5" in capsys.readouterr().out
+    gp.main(["push", str(dataset), "--version", "2.0.0", "--dry-run", "--skip-traser", *URLS])
+    assert "PUT https://gateway.test/api/v3/teams/74/datasets/5" in capsys.readouterr().out
     assert gateway.requests == []
