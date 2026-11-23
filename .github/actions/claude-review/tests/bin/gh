@@ -24,6 +24,8 @@ respond() {
 }
 
 no_pr='{"title":"","body":""}'
+# The answer to a new comment: its ID and the account that posted it.
+posted_comment='{"id":999,"user":{"login":"github-actions[bot]","type":"Bot"}}'
 
 case " $* " in
   *"/reviews "*)
@@ -31,6 +33,8 @@ case " $* " in
     respond '{}' ;;
   *" DELETE "*)
     respond '{}' ;;
+  *" POST "*)
+    respond "$posted_comment" ;;
   *"/issues/"*"/comments "*)
     respond "${GH_ISSUE_COMMENTS_JSON:-[]}" ;;
   *"/compare/"*)

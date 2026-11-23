@@ -27,7 +27,7 @@ posted_review() {
 }
 
 posted_summary() {
-  stdin_of --body-file
+  stdin_of POST | jq -r '.body'
 }
 
 @test "findings on lines in the diff are posted as one review" {
@@ -101,31 +101,41 @@ posted_summary() {
 @test "the first run posts the summary comment, with its marker" {
   write_review '[]' "All good."
   run bash "$ACTION_DIR/scripts/post.sh"
-  [ "$(count_calls --body-file)" -eq 1 ]
+  [ "$(count_calls POST)" -eq 1 ]
   [ "$(count_calls DELETE)" -eq 0 ]
   posted_summary | head -n 1 | grep -qxF '<!-- claude-review-summary -->'
   posted_summary | grep -qF 'of abcdef1'
 }
 
+# The comment list is read after the new summary is posted, so it contains the new
+# summary (999, from the fake gh) too.
 @test "a later run posts a new summary at the bottom, then deletes the previous one" {
-  export GH_ISSUE_COMMENTS_JSON='[{"id":111,"user":{"type":"User"},"body":"A person"},{"id":222,"user":{"type":"Bot"},"body":"<!-- claude-review-summary -->\nOld summary"}]'
+  export GH_ISSUE_COMMENTS_JSON='[{"id":111,"user":{"login":"someone","type":"User"},"body":"A person"},{"id":222,"user":{"login":"github-actions[bot]","type":"Bot"},"body":"<!-- claude-review-summary -->\nOld summary"},{"id":999,"user":{"login":"github-actions[bot]","type":"Bot"},"body":"<!-- claude-review-summary -->\nNew summary"}]'
   write_review '[]'
   run bash "$ACTION_DIR/scripts/post.sh"
   [ "$status" -eq 0 ]
-  [ "$(count_calls --body-file)" -eq 1 ]
+  [ "$(count_calls POST)" -eq 1 ]
   [ "$(count_calls DELETE)" -eq 1 ]
   grep -qx "repos/org/repo/issues/comments/222" "$(calls_with DELETE)"
-  posted=$(basename "$(calls_with --body-file)")
+  posted=$(basename "$(calls_with POST)")
   deleted=$(basename "$(calls_with DELETE)")
   [[ "$posted" < "$deleted" ]]
 }
 
 @test "a person's comment containing the marker isn't deleted" {
-  export GH_ISSUE_COMMENTS_JSON='[{"id":111,"user":{"type":"User"},"body":"Quoting <!-- claude-review-summary -->"}]'
+  export GH_ISSUE_COMMENTS_JSON='[{"id":111,"user":{"login":"someone","type":"User"},"body":"Quoting <!-- claude-review-summary -->"}]'
   write_review '[]'
   run bash "$ACTION_DIR/scripts/post.sh"
   [ "$(count_calls DELETE)" -eq 0 ]
-  [ "$(count_calls --body-file)" -eq 1 ]
+  [ "$(count_calls POST)" -eq 1 ]
+}
+
+@test "another bot's comment containing the marker isn't deleted" {
+  export GH_ISSUE_COMMENTS_JSON='[{"id":333,"user":{"login":"other-app[bot]","type":"Bot"},"body":"Copied: <!-- claude-review-summary -->"}]'
+  write_review '[]'
+  run bash "$ACTION_DIR/scripts/post.sh"
+  [ "$status" -eq 0 ]
+  [ "$(count_calls DELETE)" -eq 0 ]
 }
 
 @test "a diff too large to pass as one command-line argument still works" {
