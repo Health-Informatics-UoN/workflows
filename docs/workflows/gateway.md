@@ -72,6 +72,6 @@ Secrets `GATEWAY_APP_ID` and `GATEWAY_CLIENT_ID` are needed only to publish. Wit
 
 ## Things to know
 
-- **The repository is the source of truth.** Each release replaces the whole record and sets its status from `gateway.yaml`, so edits made in the Gateway's web UI are lost.
+- **The repository is the only way to change the dataset.** The Gateway doesn't allow editing a dataset managed by an integration in its web UI, including its status. Every change to the metadata or the status goes through a PR and a release.
 - **Every release adds a Gateway version**, even if nothing changed. After publishing, the job reads the dataset back and fails unless the version went up and the title matches. A failed update isn't retried, because a retry could add a second version.
-- **To make a dataset public**, set `status: ACTIVE` in `gateway.yaml` in a PR; the next release publishes it.
+- **To make a dataset public, or take it back to draft**, change `status` in `gateway.yaml` in a PR; the next release applies it.
