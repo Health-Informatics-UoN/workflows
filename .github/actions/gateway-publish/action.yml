@@ -1,62 +1,46 @@
 name: HDR UK Gateway publish
 description: >-
-  Builds HDR UK Health Data Research Gateway metadata (HDRUK 4.1.0) from a LinkML schema
-  plus hand-written catalogue fields in gateway/, validates it, and with `command: push`
-  sends it to the Gateway as a new version of an existing dataset. Run it after checking
-  out the dataset repo. Most repositories should call the reusable workflows
-  (gateway-validate.yml, gateway-publish.yml), not this action.
+  Builds HDR UK Gateway metadata from a dataset repo's LinkML schema and gateway/ files,
+  validates it with TRASER, and with `command: push` sends it as a new version of the
+  dataset. Used by .github/workflows/gateway.yml; see gateway_publish.py for details.
 
 inputs:
   command:
-    description: >-
-      validate (build and validate; needs no credentials) or push (build, validate, send a
-      new version, and read it back).
+    description: validate or push.
     required: true
   dataset-dir:
-    description: Directory holding gateway/metadata.yaml and gateway/gateway.yaml, relative to the workspace.
+    description: Directory holding gateway/.
     default: "."
   schema:
-    description: >-
-      LinkML schema, relative to the workspace. Default: the only *.yaml in dataset-dir,
-      else in dataset-dir/schemas.
+    description: LinkML schema. Default the only *.yaml in dataset-dir, else in dataset-dir/schemas.
     default: ""
   version:
-    description: >-
-      Metadata version, major.minor.patch (a leading v is removed). Required for push;
-      validate uses 0.0.0 if empty.
-    default: ""
+    description: Metadata version, major.minor.patch (a leading v is removed).
+    default: "0.0.0"
   status:
-    description: DRAFT or ACTIVE. Default is the status in gateway.yaml, else DRAFT.
+    description: DRAFT or ACTIVE. Default the status in gateway.yaml.
     default: ""
   dry-run:
-    description: With push, print the request instead of sending it. Needs no credentials.
+    description: Print the request instead of sending it.
     default: "false"
   traser:
-    description: >-
-      Validate the metadata with HDR UK's TRASER service, the way the Gateway does (against
-      HDRUK 4.1.0, then translated to GWDM). This is the only validation; false skips it.
+    description: Validate with TRASER. false skips validation.
     default: "true"
   traser-url:
-    description: TRASER base URL. Default is HDR UK's dev instance.
+    description: TRASER base URL. Default HDR UK's dev instance.
     default: ""
   base-url:
     description: Gateway API base URL.
     default: https://api.healthdatagateway.org/api
-  allow-unknown-host:
-    description: Send credentials to a base-url that isn't a known Gateway host.
-    default: "false"
   team-id:
-    description: Gateway team ID. Default is team_id in gateway.yaml; if set, it must match.
+    description: Gateway team ID. Default team_id in gateway.yaml; if set, it must match.
     default: ""
   app-id:
-    description: The Private App's App ID. Required for push, unless dry-run.
+    description: The Private App's App ID (push only).
     default: ""
   client-id:
-    description: The Private App's Client ID. Required for push, unless dry-run.
+    description: The Private App's Client ID (push only).
     default: ""
-  python-version:
-    description: Python version to run the tool with.
-    default: "3.13"
 
 runs:
   using: composite
@@ -64,11 +48,9 @@ runs:
     # uv installs the dependencies pinned in this action's uv.lock.
     - name: Set up uv
       uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
-      with:
-        python-version: ${{ inputs.python-version }}
-        enable-cache: false
 
-    - name: Run gateway-publish
+    # Inputs reach the script as environment variables, never interpolated into the shell.
+    - name: Run gateway_publish.py
       shell: bash
       env:
         COMMAND: ${{ inputs.command }}
@@ -80,8 +62,14 @@ runs:
         TRASER: ${{ inputs.traser }}
         TRASER_URL: ${{ inputs.traser-url }}
         GATEWAY_BASE_URL: ${{ inputs.base-url }}
-        GATEWAY_ALLOW_UNKNOWN_HOST: ${{ inputs.allow-unknown-host == 'true' && '1' || '' }}
         GATEWAY_TEAM_ID: ${{ inputs.team-id }}
         GATEWAY_APP_ID: ${{ inputs.app-id }}
         GATEWAY_CLIENT_ID: ${{ inputs.client-id }}
-      run: bash "$GITHUB_ACTION_PATH/scripts/run.sh"
+      run: |
+        args=("$COMMAND" "$DATASET_DIR" --version "$VERSION")
+        if [ -n "$SCHEMA" ]; then args+=(--schema "$SCHEMA"); fi
+        if [ -n "$STATUS" ]; then args+=(--status "$STATUS"); fi
+        if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+        if [ "$TRASER" != "true" ]; then args+=(--skip-traser); fi
+        uv run --quiet --frozen --no-dev --project "$GITHUB_ACTION_PATH" \
+          python "$GITHUB_ACTION_PATH/gateway_publish.py" "${args[@]}"

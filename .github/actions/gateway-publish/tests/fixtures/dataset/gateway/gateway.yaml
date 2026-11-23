@@ -1,8 +1,0 @@
-# HDR UK Gateway settings for this dataset.
-team_id: 74
-team_name: Nottingham University Hospitals - NHS Trust
-# Status each release publishes with: DRAFT or ACTIVE (listed in the Gateway's catalogue).
-status: DRAFT
-# Written by `gateway-publish create`. Edit by hand only to recover a lost ID.
-dataset_id: null
-pid: null
