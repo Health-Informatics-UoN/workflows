@@ -33,8 +33,14 @@ prompt="$(cat "$GITHUB_ACTION_PATH/prompt/prompt.md")
 $(cat "$GITHUB_ACTION_PATH/prompt/standards.md")"
 
 # The limits on Claude. Each is a flag below. If you remove one, review.bats fails.
+# --bare: do not load CLAUDE.md files, hooks, plugins or auto memory, and do not read
+#   the keychain. A CLAUDE.md in the PR could otherwise import files with "@path" lines.
+#   Claude Code reads imports itself, so the --allowedTools and --disallowedTools rules
+#   possibly do not apply to them. Claude still applies the CLAUDE.md or REVIEW.md of the
+#   repository, because the prompt tells it to read them with the Read tool.
 # --setting-sources user: ignore all .claude/settings.json files in the repo, so they
-#   cannot change the tools that Claude can use or add hooks.
+#   cannot change the tools that Claude can use or add hooks. This also stops the
+#   project CLAUDE.md, which is a second barrier with --bare.
 # --strict-mcp-config with no --mcp-config: start no MCP servers, so a .mcp.json in the
 #   repo cannot run a command on the runner, where the API key is visible.
 # --tools: Claude has only Read, Grep and Glob. The flag removes other tools (for
@@ -63,6 +69,7 @@ deny=${deny%,}  # Remove the last comma.
 # "|| true": a failed run also prints JSON that contains the error. The checks below
 # examine it and show a clearer message.
 "$GITHUB_ACTION_PATH/node_modules/.bin/claude" -p "$prompt" \
+  --bare \
   --model "$MODEL" \
   --max-turns "$MAX_TURNS" \
   --effort "$EFFORT" \
@@ -74,6 +81,15 @@ deny=${deny%,}  # Remove the last comma.
   --allowedTools "$allow" \
   --disallowedTools "$deny" \
   > "$out" || true
+
+# A last barrier, which does not depend on the restrictions above: if the API key is in
+# the output, stop before this script shows the output and before post.sh posts it.
+# This finds the key as plain text only, not encoded (for example, as base64).
+if grep -qF -- "$ANTHROPIC_API_KEY" "$out"; then
+  rm -f "$out"
+  echo "::error::The Claude output contains the API key. Nothing is posted. Rotate the key."
+  exit 1
+fi
 
 # For some failures (for example, no credit), Claude Code prints plain text, not JSON.
 # Show that text as the error. If not, a jq error that is not clear occurs later.
