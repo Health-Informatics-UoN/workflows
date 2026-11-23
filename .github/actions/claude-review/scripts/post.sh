@@ -198,7 +198,11 @@ if [ "$count" -gt 0 ]; then
          <<< "$split" \
        | gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" --input - > /dev/null; then
     echo "::warning::GitHub rejected the review; listing all findings in the summary."
-    split=$(jq '{comments: [], unanchored: (.unanchored + (.comments | map({path, line, body: (.body | split("\n\n<!--")[0])})))}' <<< "$split")
+    # Remove only the marker that the script added. The text of a finding can contain
+    # other HTML comments.
+    split=$(jq --arg marker "$finding_marker" '{comments: [], unanchored: (.unanchored
+      + (.comments | map({path, line, body: (.body | rtrimstr("\n\n" + $marker))})))}' \
+      <<< "$split")
     count=0
   fi
 fi
@@ -218,13 +222,23 @@ body=$(
       else empty end' <<< "$split"
 )
 
-# Old summaries. The bot check keeps comments from people that quote the marker.
-previous=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
-  --jq ".[] | select(.user.type == \"Bot\" and (.body | contains(\"$summary_marker\"))) | .id")
-
 # Post the new summary first, so the PR always has a summary if a step fails. Send the
 # body on stdin, not as an argument: a long body can exceed the 128 KiB argument limit.
-printf '%s' "$body" | gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file -
+# The answer gives the ID of the new comment and the login of the account that posted
+# it: github-actions[bot] for the default token, or the app or person of another token.
+# (gh api user does not work with the default token, so the script gets the login here.)
+posted=$(printf '%s' "$body" | jq -Rs '{body: .}' \
+  | gh api --method POST "repos/${REPO}/issues/${PR_NUMBER}/comments" --input - \
+    --jq '{id, login: .user.login}')
+new_id=$(jq -r '.id' <<< "$posted")
+login=$(jq -r '.login' <<< "$posted")
+
+# Old summaries: comments from the same account that start with the marker, except the
+# new one. Other bots, and a person who quotes a summary (with a personal token, the
+# summaries come from that person), have comments that do not start with the marker.
+previous=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+  --jq ".[] | select(.user.login == \"$login\" and .id != $new_id
+    and (.body | startswith(\"$summary_marker\"))) | .id")
 
 for id in $previous; do
   gh api -X DELETE "repos/${REPO}/issues/comments/${id}" > /dev/null \

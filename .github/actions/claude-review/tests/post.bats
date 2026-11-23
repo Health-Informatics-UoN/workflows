@@ -28,7 +28,7 @@ posted_review() {
 }
 
 posted_summary() {
-  stdin_of --body-file
+  stdin_of POST | jq -r .body
 }
 
 @test "findings on lines in the diff are posted as one review" {
@@ -202,7 +202,7 @@ posted_summary() {
   [[ "$output" == *"::warning::Could not check review thread T_1"* ]]
   [ "$(count_calls resolveReviewThread)" -eq 0 ]
   [ "$(count_calls /reviews)" -eq 1 ]
-  [ "$(count_calls --body-file)" -eq 1 ]
+  [ "$(count_calls POST)" -eq 1 ]
 }
 
 @test "a thread that a person resolves during the review is not changed" {
@@ -216,31 +216,51 @@ posted_summary() {
 @test "the first run posts the summary comment, with its marker" {
   write_review '[]' "All good."
   run bash "$ACTION_DIR/scripts/post.sh"
-  [ "$(count_calls --body-file)" -eq 1 ]
+  [ "$(count_calls POST)" -eq 1 ]
   [ "$(count_calls DELETE)" -eq 0 ]
   posted_summary | head -n 1 | grep -qxF '<!-- claude-review-summary -->'
   posted_summary | grep -qF 'of abcdef1'
 }
 
+# post.sh reads the comments after it posts the new summary, so the list contains the
+# new summary too (999, from the fake gh). It must not be deleted.
 @test "a later run posts a new summary at the bottom, then deletes the previous one" {
-  export GH_ISSUE_COMMENTS_JSON='[{"id":111,"user":{"type":"User"},"body":"A person"},{"id":222,"user":{"type":"Bot"},"body":"<!-- claude-review-summary -->\nOld summary"}]'
+  export GH_ISSUE_COMMENTS_JSON='[{"id":111,"user":{"login":"alice","type":"User"},"body":"A person"},{"id":222,"user":{"login":"github-actions[bot]","type":"Bot"},"body":"<!-- claude-review-summary -->\nOld summary"},{"id":999,"user":{"login":"github-actions[bot]","type":"Bot"},"body":"<!-- claude-review-summary -->\nNew summary"}]'
   write_review '[]'
   run bash "$ACTION_DIR/scripts/post.sh"
   [ "$status" -eq 0 ]
-  [ "$(count_calls --body-file)" -eq 1 ]
+  [ "$(count_calls POST)" -eq 1 ]
   [ "$(count_calls DELETE)" -eq 1 ]
   grep -qx "repos/org/repo/issues/comments/222" "$(calls_with DELETE)"
-  posted=$(basename "$(calls_with --body-file)")
+  posted=$(basename "$(calls_with POST)")
   deleted=$(basename "$(calls_with DELETE)")
   [[ "$posted" < "$deleted" ]]
 }
 
 @test "a person's comment containing the marker isn't deleted" {
-  export GH_ISSUE_COMMENTS_JSON='[{"id":111,"user":{"type":"User"},"body":"Quoting <!-- claude-review-summary -->"}]'
+  export GH_ISSUE_COMMENTS_JSON='[{"id":111,"user":{"login":"alice","type":"User"},"body":"Quoting <!-- claude-review-summary -->"}]'
   write_review '[]'
   run bash "$ACTION_DIR/scripts/post.sh"
   [ "$(count_calls DELETE)" -eq 0 ]
-  [ "$(count_calls --body-file)" -eq 1 ]
+  [ "$(count_calls POST)" -eq 1 ]
+}
+
+@test "another bot's comment that starts with the marker isn't deleted" {
+  export GH_ISSUE_COMMENTS_JSON='[{"id":333,"user":{"login":"other-app[bot]","type":"Bot"},"body":"<!-- claude-review-summary -->\nCopied"}]'
+  write_review '[]'
+  run bash "$ACTION_DIR/scripts/post.sh"
+  [ "$status" -eq 0 ]
+  [ "$(count_calls DELETE)" -eq 0 ]
+}
+
+# With a personal token, the summaries come from a person. A quote by that person
+# contains the marker, but does not start with it.
+@test "a quote from the same account that doesn't start with the marker isn't deleted" {
+  export GH_ISSUE_COMMENTS_JSON='[{"id":444,"user":{"login":"github-actions[bot]","type":"Bot"},"body":"> <!-- claude-review-summary -->\n> Old summary\n\nI disagree."}]'
+  write_review '[]'
+  run bash "$ACTION_DIR/scripts/post.sh"
+  [ "$status" -eq 0 ]
+  [ "$(count_calls DELETE)" -eq 0 ]
 }
 
 @test "a diff too large to pass as one command-line argument still works" {
@@ -281,4 +301,13 @@ posted_summary() {
   posted_summary | grep -qF '0 inline finding(s)'
   posted_summary | grep -qxF -- '- `app.py:2`: First'
   posted_summary | grep -qF '`app.py:10`: Not in diff'
+}
+
+@test "if GitHub rejects the review, a finding with its own HTML comment is kept whole" {
+  export GH_FAIL_REVIEW=1
+  write_review '[{"path":"app.py","line":2,"body":"Before\n\n<!-- x -->\nAfter"}]'
+  run bash "$ACTION_DIR/scripts/post.sh"
+  [ "$status" -eq 0 ]
+  posted_summary | grep -qxF 'After'
+  ! posted_summary | grep -qF 'claude-review-finding'
 }

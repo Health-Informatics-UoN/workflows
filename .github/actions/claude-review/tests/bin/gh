@@ -45,6 +45,9 @@ case " $* " in
     respond '{}' ;;
   *" PATCH "*|*" DELETE "*)
     respond '{}' ;;
+  *" POST "*)
+    # A new comment: its ID and the account that posted it.
+    respond '{"id":999,"user":{"login":"github-actions[bot]","type":"Bot"}}' ;;
   *"/issues/"*"/comments "*)
     respond "${GH_ISSUE_COMMENTS_JSON:-[]}" ;;
   *"/compare/"*)

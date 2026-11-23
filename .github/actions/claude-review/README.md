@@ -36,7 +36,10 @@ What users see is in [the workflow docs](../../../docs/workflows/claude-review.m
 
 - GitHub only accepts comments on diff lines, so findings on other lines go into the summary.
 - The workflow token can't resolve threads, and the action doesn't ask for more permission, so earlier findings are marked superseded instead.
-- Hidden markers (HTML comments) identify the action's comments on later runs. Anyone can copy a marker, so a comment counts only if a bot posted it.
+- Hidden markers (HTML comments) identify the action's comments on later runs. Anyone can copy a marker, so:
+  - an old summary is deleted only if it comes from the account that posted the new one and starts with the marker;
+  - the too-large notice counts only if a comment starts with the marker;
+  - an earlier finding counts only if a bot started its thread. With a personal access token, earlier findings come from a person, so they aren't superseded or given to Claude; use the default token or an app token.
 - The checkout, diff and comments all use the event's commit, so a push during a review can't shift line numbers.
 
 ## Tests

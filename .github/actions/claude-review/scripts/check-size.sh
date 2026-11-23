@@ -26,11 +26,13 @@ echo "too-large=true" >> "$GITHUB_OUTPUT"
 # GitHub does not show an HTML comment, but the next run finds it in the comment text.
 marker="<!-- claude-review-too-large -->"
 
-# Only bot comments count. If not, a person can copy the marker and stop the notice.
-comments=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
-  --jq '.[] | select(.user.type == "Bot") | .body')
+# The notice starts with the marker. A comment that only quotes the notice does not.
+# The author is not checked: this step runs before the action posts anything, so it
+# does not know its login. A wrong match only stops a notice; the PR is skipped anyway.
+found=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+  --jq "[.[] | select(.body | startswith(\"$marker\"))] | length")
 
-if grep -qF "$marker" <<< "$comments"; then
+if [ "$found" -gt 0 ]; then
   echo "Too-large comment already posted; skipping review."
   exit 0
 fi

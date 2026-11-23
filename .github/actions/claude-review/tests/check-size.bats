@@ -39,8 +39,8 @@ setup() {
   [ -z "$(calls_with_arg comment)" ]
 }
 
-@test "a person's comment containing the marker doesn't stop the notice" {
-  export GH_ISSUE_COMMENTS_JSON='[{"user":{"type":"User"},"body":"<!-- claude-review-too-large -->"}]'
+@test "a comment that only quotes the marker doesn't stop the notice" {
+  export GH_ISSUE_COMMENTS_JSON='[{"user":{"type":"Bot"},"body":"> <!-- claude-review-too-large -->\n> PR too large"}]'
   ADDITIONS=80 DELETIONS=30 run bash "$ACTION_DIR/scripts/check-size.sh"
   [ "$status" -eq 0 ]
   [ "$(calls_with_arg comment | grep -c .)" -eq 1 ]
