@@ -13,12 +13,12 @@ The metadata combines the LinkML schema (tables, columns and permitted values) w
    team_id: 74
    team_name: Nottingham University Hospitals - NHS Trust
    status: DRAFT        # or ACTIVE; every release publishes with this status
-   dataset_id: null     # written by create (step 4)
+   dataset_id: null     # from create (step 4)
    pid: null
    ```
 
 3. **A `gateway` environment** (Settings → Environments) with required reviewers, and the Private App's credentials as environment secrets `GATEWAY_APP_ID` and `GATEWAY_CLIENT_ID`. Create it before the first release: GitHub creates a missing environment without protection.
-4. **Create the dataset once**, from a local checkout, then commit `gateway/gateway.yaml`:
+4. **Create the dataset once**, from a local checkout. It prints the new `dataset_id` and `pid`: add them to `gateway/gateway.yaml` and commit.
 
    ```sh
    A=<workflows checkout>/.github/actions/gateway-publish

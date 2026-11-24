@@ -7,7 +7,7 @@ The payload (HDRUK 4.1.0) is built from a dataset directory:
 
 Commands:
   validate DIR             build, then check with TRASER
-  create DIR --version V   once per dataset; writes dataset_id and pid to gateway.yaml
+  create DIR --version V   once per dataset; prints the dataset_id and pid to add to gateway.yaml
   push DIR --version V     validate, PUT a new version, read it back
 
 Gateway API notes (HDR UK's integration docs describe a retired API):
@@ -216,17 +216,6 @@ def body(payload: dict, status: str) -> dict:
     return {"metadata": envelope, "create_origin": "API", "status": status}
 
 
-def record_created(path: Path, dataset_id: int, pid: str | None) -> None:
-    """Write dataset_id and pid into gateway.yaml, keeping its comments."""
-    text = path.read_text()
-    for key, value in (("dataset_id", dataset_id), ("pid", pid)):
-        line = f"{key}: {'null' if value is None else value}"
-        text, n = re.subn(rf"^{key}:.*$", line, text, count=1, flags=re.MULTILINE)
-        if not n:
-            text = text.rstrip("\n") + f"\n{line}\n"
-    path.write_text(text)
-
-
 def validate(args: argparse.Namespace) -> tuple[dict, dict]:
     """Build the payload and check it with TRASER. Returns (payload, gateway.yaml)."""
     payload, gateway = build(args.dataset, args.schema, args.version or "0.0.0")
@@ -239,20 +228,19 @@ def validate(args: argparse.Namespace) -> tuple[dict, dict]:
 
 
 def create(args: argparse.Namespace) -> None:
-    """Create the dataset on the Gateway, once, and record its ID in gateway.yaml."""
+    """Create the dataset on the Gateway, once. A person adds the printed ID to gateway.yaml."""
     payload, gateway = validate(args)
     if gateway.get("dataset_id"):
         raise Error(f"gateway.yaml already has dataset_id {gateway['dataset_id']}; use push")
     status = args.status or gateway.get("status") or "DRAFT"
     datasets = f"/v2/teams/{gateway['team_id']}/datasets"
-    gateway_yaml = args.dataset / "gateway" / "gateway.yaml"
     with gateway_client(args.gateway_url) as client:
         dataset_id = call(client, "POST", datasets, json=body(payload, status),
                           params={"input_schema": SCHEMA[0], "input_version": SCHEMA[1]})["data"]
-        record_created(gateway_yaml, dataset_id, None)  # save the ID first, so it is never lost
+        # Print the ID before anything else can fail, so it is never lost.
+        print(f"Created {status} dataset {dataset_id}", flush=True)
         pid = call(client, "GET", f"{datasets}/{dataset_id}")["data"].get("pid")
-    record_created(gateway_yaml, dataset_id, pid)
-    print(f"Created {status} dataset {dataset_id}; commit gateway/gateway.yaml")
+    print(f"Add these to gateway/gateway.yaml and commit:\n  dataset_id: {dataset_id}\n  pid: {pid}")
 
 
 def push(args: argparse.Namespace) -> None:

@@ -42,7 +42,7 @@ provenance:
 
 URLS = ["--gateway-url", "https://gateway.test/api", "--traser-url", "https://traser.test"]
 
-GATEWAY = """# comment kept
+GATEWAY = """
 team_id: 74
 team_name: NUH
 status: DRAFT
@@ -118,8 +118,10 @@ def test_build_errors(dataset, metadata, version, error):
 
 def test_create_then_push(dataset, gateway, capsys):
     gp.main(["create", str(dataset), "--version", "1.0.0", *URLS])
-    gateway_yaml = (dataset / "gateway" / "gateway.yaml").read_text()
-    assert "# comment kept" in gateway_yaml and "dataset_id: 2080" in gateway_yaml and "pid: pid-1" in gateway_yaml
+    assert "dataset_id: 2080\n  pid: pid-1" in capsys.readouterr().out
+    gateway_yaml = dataset / "gateway" / "gateway.yaml"
+    assert gateway_yaml.read_text() == GATEWAY  # create doesn't write to the repo
+    gateway_yaml.write_text(GATEWAY.replace("dataset_id: null", "dataset_id: 2080").replace("pid: null", "pid: pid-1"))
     post = next(r for r in gateway.requests if r.method == "POST" and r.url.path != "/translate")
     assert str(post.url).startswith("https://gateway.test/api/v2/teams/74/datasets")
     assert post.headers["x-application-id"] == "app-secret"
