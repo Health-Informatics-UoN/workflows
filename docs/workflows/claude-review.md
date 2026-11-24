@@ -61,18 +61,6 @@ How the action works, its security restrictions and its tests: see the action's 
 
 If your organisation allows only selected actions, allow the ones the workflow uses: `actions/checkout`, `actions/setup-node` and `astral-sh/setup-uv`.
 
-## Disagreeing with a finding
-
-Reply to the finding to say why, then resolve it or leave it open. Later reviews get your reply and won't raise the finding again, unless the code changes in a way your reply doesn't cover. Only replies from owners, organisation members and collaborators count: anyone can comment on a public pull request.
-
-## Good to know
-
-- Pull requests from forks and Dependabot are skipped: they don't get secrets.
-- Pull requests over `max-lines` are skipped, with one comment saying so.
-- The diff, and files Claude reads, are sent to Anthropic's API. Check this is allowed for your code.
-- Claude also applies your repository's `REVIEW.md` or `CLAUDE.md`, which win over the [general standards](../../.github/actions/claude-review/prompt/standards.md).
-- The workflow runs `claude -p` with an API key, which the monthly API credits of Claude Max, Ultra and Team plans cover; they don't cover `anthropics/claude-code-action`. See [Monthly API credits](https://support.claude.com/en/articles/17154008).
-
 ## Inputs
 
 | Input       | Default             | Description |
@@ -84,3 +72,15 @@ Reply to the finding to say why, then resolve it or leave it open. Later reviews
 | `label`     | `claude-review`     | Label that requests a review. |
 
 All inputs are optional.
+
+## Things to know
+
+- Pull requests from forks and Dependabot are skipped: they don't get secrets.
+- Pull requests over `max-lines` are skipped, with one comment saying so.
+- The diff, and files Claude reads, are sent to Anthropic's API. Check this is allowed for your code.
+- Claude also applies your repository's `REVIEW.md` or `CLAUDE.md`, which win over the [general standards](../../.github/actions/claude-review/prompt/standards.md).
+- The workflow runs `claude -p` with an API key, which the monthly API credits of Claude Max, Ultra and Team plans cover; they don't cover `anthropics/claude-code-action`. See [Monthly API credits](https://support.claude.com/en/articles/17154008).
+
+## Disagreeing with a finding
+
+Reply to the finding to say why, then resolve it or leave it open. Later reviews get your reply and won't raise the finding again, unless the code changes in a way your reply doesn't cover. Only replies from owners, organisation members and collaborators count: anyone can comment on a public pull request.
