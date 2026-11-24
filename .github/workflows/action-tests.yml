@@ -21,7 +21,7 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  claude-review:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo

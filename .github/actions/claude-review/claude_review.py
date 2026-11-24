@@ -15,8 +15,7 @@ The steps get their settings from environment variables, which action.yml sets:
 GH_TOKEN, REPO (owner/name), PR_NUMBER, BASE_SHA, HEAD_SHA, ADDITIONS, DELETIONS,
 MAX_LINES, ANTHROPIC_API_KEY, MODEL, MAX_TURNS and EFFORT. GitHub Actions sets
 GITHUB_WORKSPACE (the checkout), RUNNER_TEMP, GITHUB_OUTPUT, GITHUB_API_URL and
-GITHUB_GRAPHQL_URL. uv runs this script from the action's folder, not from the
-checkout, so the checkout is GITHUB_WORKSPACE, not the current directory.
+GITHUB_GRAPHQL_URL. The script finds the checkout in GITHUB_WORKSPACE.
 
 Claude reviews code that the PR can change, so the review command gives it no GitHub
 token, and only Read, Grep and Glob in the checkout. See README.md, "Security".

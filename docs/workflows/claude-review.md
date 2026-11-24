@@ -17,18 +17,23 @@ How the action works, its security restrictions and its tests: see the action's 
 3. **Add the workflow** as `.github/workflows/check.claude-review.yml`, copied from [the sample](../../samples/check.claude-review.yaml):
 
    ```yaml
-   name: Claude PR review
+   name: "Claude PR review"
 
    on:
      pull_request:
-       # labeled: adding the claude-review label requests a review.
-       types: [opened, synchronize, ready_for_review, labeled]
+       types:
+         - opened
+         - synchronize
+         - ready_for_review
+         # Adding the claude-review label requests a review.
+         - labeled
 
    permissions: {}
 
    jobs:
      claude:
-       uses: health-informatics-uon/workflows/.github/workflows/claude-review.yml@<sha> # <version>
+       # Replace <NEW_SHA> and <NEW_VERSION> with a release that includes claude-review.yml.
+       uses: health-informatics-uon/workflows/.github/workflows/claude-review.yml@<NEW_SHA> # <NEW_VERSION>
        permissions:
          contents: read
          pull-requests: write
@@ -36,7 +41,7 @@ How the action works, its security restrictions and its tests: see the action's 
          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
    ```
 
-   - Replace `<sha>` and `<version>` with a release that includes this workflow (see [pinning](dependabot.md#pinning-strategy)). Don't use `@main`: it changes without review, and this workflow gets your API key.
+   - Replace `<NEW_SHA>` and `<NEW_VERSION>` with a release that includes this workflow (see [pinning](dependabot.md#pinning-strategy)). Don't use `@main`: it changes without review, and this workflow gets your API key.
    - Pass the secret by name, as above, not with `secrets: inherit`, so Claude Code gets only this secret.
    - `pull-requests: write` lets it post comments; `contents: read` stops it pushing.
 

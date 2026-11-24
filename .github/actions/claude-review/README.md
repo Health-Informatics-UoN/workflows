@@ -4,7 +4,7 @@ A composite action that reviews a pull request with Claude Code and posts the fi
 
 ## How a review runs
 
-The steps are in [`action.yml`](action.yml). The code is one script, [`claude_review.py`](claude_review.py), with one command for each step; its header lists the environment it uses. uv installs its dependencies from [`uv.lock`](uv.lock), and runs it from this folder, not from the checkout.
+The steps are in [`action.yml`](action.yml). The code is one script, [`claude_review.py`](claude_review.py), with one command for each step; its header lists the environment it uses. uv installs its dependencies from [`uv.lock`](uv.lock).
 
 | Step | Command | What it does |
 |---|---|---|
@@ -29,7 +29,7 @@ Claude reviews code that anyone with write access can change, so it's restricted
 - **No GitHub token:** the workflow's checkout doesn't keep it (`persist-credentials: false`, not tested), and the GitHub token is only in the steps before and after Claude.
 - **No comments, with one exception:** anyone can comment on a public PR, so Claude gets only replies to the action's own findings (threads a bot started) from owners, members and collaborators.
 - **Output is data:** `post` sends Claude's output to the GitHub API as JSON, never in a shell command.
-- **The PR can't change the setup:** uv runs from this folder, so a `uv.toml` or `.python-version` in the PR is ignored.
+- **The PR can't change the setup:** uv reads its settings from this folder (`--project`), so a `uv.toml` or `.python-version` in the PR is ignored.
 
 One known gap: Claude applies `REVIEW.md` or `CLAUDE.md` from the PR's commit, and they win over the standards, so a PR can weaken its own review.
 
