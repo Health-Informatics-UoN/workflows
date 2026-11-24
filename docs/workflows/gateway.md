@@ -1,6 +1,6 @@
 # HDR UK Gateway
 
-Reusable workflow that publishes a dataset's metadata to the [HDR UK Health Data Research Gateway](https://healthdatagateway.org) from a LinkML repo. It always validates; with `publish: true` it also sends the metadata as a new version of the dataset.
+Reusable workflow that publishes a dataset's metadata to the [HDR UK Health Data Research Gateway](https://healthdatagateway.org) from a LinkML repo. It always validates; with `publish: true` it also sends the metadata as a new version of the dataset, and with `create: true` it creates the dataset in the first place.
 
 The metadata combines the LinkML schema (tables, columns and permitted values) with `gateway/metadata.yaml`, the catalogue fields written by hand in the [HDRUK 4.1.0 schema](https://github.com/HDRUK/schemata-2/tree/master/hdr_schemata/models/HDRUK/4.1.0)'s shape. Validation is done by HDR UK's TRASER service, the way the Gateway does it.
 
@@ -18,7 +18,24 @@ The metadata combines the LinkML schema (tables, columns and permitted values) w
    ```
 
 3. **A `gateway` environment** (Settings → Environments) with required reviewers, and the Private App's credentials as environment secrets `GATEWAY_APP_ID` and `GATEWAY_CLIENT_ID`. Create it before the first release: GitHub creates a missing environment without protection.
-4. **Create the dataset once**, from a local checkout. It prints the new `dataset_id` and `pid`: add them to `gateway/gateway.yaml` and commit.
+4. **Create the dataset once.** Add this workflow, run it from the Actions tab ("Run workflow"), and approve the `gateway` environment. The job log prints the new `dataset_id` and `pid`: add them to `gateway/gateway.yaml` and commit. It refuses to run once `gateway.yaml` has a `dataset_id`, so it's safe to keep.
+
+   ```yaml
+   # .github/workflows/gateway-create.yml
+   name: Create Gateway dataset
+   on: workflow_dispatch
+   jobs:
+     gateway:
+       uses: health-informatics-uon/workflows/.github/workflows/gateway.yml@<tag>
+       permissions:
+         contents: read
+       with:
+         create: true
+         version: 0.0.0   # the first release publishes the real version
+       secrets: inherit
+   ```
+
+   To create it from your machine instead, with the credentials in your shell:
 
    ```sh
    A=<workflows checkout>/.github/actions/gateway-publish
@@ -59,17 +76,18 @@ The metadata combines the LinkML schema (tables, columns and permitted values) w
 | Input | Default | Description |
 |---|---|---|
 | `publish` | `false` | Publish after validating. |
-| `version` | — | Metadata version, `major.minor.patch`; a leading `v` is removed. Pass the release tag; required to publish. |
+| `create` | `false` | Create the dataset instead of publishing (once per dataset). |
+| `version` | — | Metadata version, `major.minor.patch`; a leading `v` is removed. Pass the release tag; required to publish or create. |
 | `dataset-dir` | `.` | Directory holding `gateway/`. |
 | `schema` | the only `*.yaml` in `dataset-dir`, else in `dataset-dir/schemas` | LinkML schema. |
 | `status` | `status` in `gateway.yaml` | `DRAFT` or `ACTIVE`. |
 | `dry-run` | `false` | Print the publish request instead of sending it. |
-| `environment` | `gateway` | GitHub environment for the publish job. |
+| `environment` | `gateway` | GitHub environment for the publish and create job. |
 | `base-url` | `https://api.healthdatagateway.org/api` | Gateway API base URL. |
 | `traser` | `true` | Validate with TRASER; `false` skips validation. |
 | `traser-url` | `https://hdr-gateway-traser-dev-qmnkcg5qjq-ew.a.run.app` (HDR UK's dev instance) | TRASER base URL. |
 
-Secrets `GATEWAY_APP_ID` and `GATEWAY_CLIENT_ID` are needed only to publish. With `secrets: inherit`, the publish job uses the environment's secrets; you can pass repository secrets by name instead.
+Secrets `GATEWAY_APP_ID` and `GATEWAY_CLIENT_ID` are needed only to publish or create. With `secrets: inherit`, the publish job uses the environment's secrets; you can pass repository secrets by name instead.
 
 ## Things to know
 

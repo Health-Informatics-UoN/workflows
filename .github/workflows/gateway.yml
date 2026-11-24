@@ -1,7 +1,7 @@
 # Validates a dataset repo's HDR UK Gateway metadata and, with `publish: true`, publishes
 # it as a new version of the dataset. Call it without inputs on pull requests (no secrets
-# needed), and with `publish: true` after semantic-release creates a release. See
-# docs/workflows/gateway.md.
+# needed), with `publish: true` after semantic-release creates a release, and once with
+# `create: true` from a manual workflow to create the dataset. See docs/workflows/gateway.md.
 name: HDR UK Gateway
 
 on:
@@ -11,8 +11,12 @@ on:
         description: Publish after validating. Needs the secrets and an existing dataset_id in gateway.yaml.
         type: boolean
         default: false
+      create:
+        description: Create the dataset on the Gateway instead of publishing, once per dataset. Prints the dataset_id and pid to add to gateway.yaml.
+        type: boolean
+        default: false
       version:
-        description: Metadata version, major.minor.patch (a leading v is removed). Pass the release tag; required to publish.
+        description: Metadata version, major.minor.patch (a leading v is removed). Pass the release tag; required to publish or create.
         type: string
         default: ""
       dataset-dir:
@@ -32,7 +36,7 @@ on:
         type: boolean
         default: false
       environment:
-        description: GitHub environment for the publish job; give it required reviewers.
+        description: GitHub environment for the publish and create job; give it required reviewers.
         type: string
         default: gateway
       base-url:
@@ -81,7 +85,7 @@ jobs:
           traser-url: ${{ inputs.traser-url }}
 
   publish:
-    if: inputs.publish
+    if: inputs.publish || inputs.create
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -92,13 +96,19 @@ jobs:
       group: gateway-publish-${{ github.repository }}
       cancel-in-progress: false
     steps:
+      - name: Check inputs
+        if: inputs.publish && inputs.create
+        run: |
+          echo "::error::Set publish or create, not both"
+          exit 1
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - uses: $/.github/actions/gateway-publish
         with:
-          command: push
+          command: ${{ inputs.create && 'create' || 'push' }}
           dataset-dir: ${{ inputs.dataset-dir }}
           schema: ${{ inputs.schema }}
           version: ${{ inputs.version }}

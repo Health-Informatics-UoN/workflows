@@ -6,7 +6,7 @@ description: >-
 
 inputs:
   command:
-    description: validate or push.
+    description: validate, create or push.
     required: true
   dataset-dir:
     description: Directory holding gateway/.
@@ -15,7 +15,7 @@ inputs:
     description: LinkML schema. Default the only *.yaml in dataset-dir, else in dataset-dir/schemas.
     default: ""
   version:
-    description: Metadata version, major.minor.patch (a leading v is removed). Required for push.
+    description: Metadata version, major.minor.patch (a leading v is removed). Required for create and push.
     default: ""
   status:
     description: DRAFT or ACTIVE. Default the status in gateway.yaml.
