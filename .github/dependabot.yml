@@ -27,6 +27,16 @@ updates:
       - dependency-name: "tyriis/docker-image-tag-exists"
         versions: [">= 2026"]
 
+  # This entry updates the Python dependencies of the Claude review action (uv.lock).
+  - package-ecosystem: "uv"
+    directory: "/.github/actions/claude-review"
+    schedule:
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "fix(dependencies): "
+
   # This entry updates the Claude Code CLI that the Claude review action uses
   # (package-lock.json).
   - package-ecosystem: "npm"

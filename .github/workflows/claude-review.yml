@@ -12,7 +12,7 @@ on:
   workflow_call:
     inputs:
       # The defaults of model, max-lines, max-turns and effort are the same as in the
-      # action. .github/actions/claude-review/tests/defaults.bats checks this.
+      # action. .github/actions/claude-review/test_claude_review.py checks this.
       # max-turns and max-lines are related. Claude uses turns to read files, so a
       # larger PR needs more turns. If Claude uses all its turns, the review fails.
       model:
