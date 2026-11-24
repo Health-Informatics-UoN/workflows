@@ -1,6 +1,6 @@
 # Claude review action
 
-A composite action that reviews a pull request with Claude Code and posts the findings as comments. This page is for people changing it. To use it, see [the workflow docs](../../../docs/workflows/claude-review.md): most repositories should call the reusable workflow, not this action.
+A composite action that reviews a pull request with Claude Code and posts the findings as comments. This page is for people changing it. To use it, see [the workflow docs](../../../docs/workflows/claude-review.md), which has the [setup steps](../../../docs/workflows/claude-review.md#set-up-a-repository): most repositories should call the reusable workflow, not this action.
 
 ## How a review runs
 
@@ -44,6 +44,59 @@ What users see is in [the workflow docs](../../../docs/workflows/claude-review.m
   - the too-large notice counts only if a comment starts with the marker;
   - an earlier finding counts only if a bot started its thread. With a personal access token, earlier findings come from a person, so they aren't superseded or given to Claude; use the default token or an app token.
 - The checkout, diff and comments all use the event's commit, so a push during a review can't shift line numbers.
+
+## What happens when…
+
+Situations the action and the reusable workflow handle, and what you see. Most have a test in `test_claude_review.py`.
+
+**When a review runs**
+
+| Situation | What happens |
+|---|---|
+| Someone pushes while a review runs | The push starts a new run for the new commit, and the workflow cancels the old one (`concurrency`, `cancel-in-progress`). Until the cancel arrives, or if the action is used directly without that setting, the old run keeps to its own commit, so its comments still land on the right lines. |
+| The PR is a draft | Skipped, unless someone adds the review label. |
+| The review label is added | A review runs, also on a draft. The label is removed afterwards, also if the review failed, so it can be added again. A different label does nothing. |
+| The label is added to a closed or merged PR | Nothing runs. |
+| The PR is from a fork, or from Dependabot | Skipped: they get no secrets. |
+| The PR is over `max-lines` | Skipped, with one comment saying so. Later pushes don't repeat it; a comment that only quotes the notice doesn't count. |
+
+**Before Claude starts**
+
+| Situation | What happens |
+|---|---|
+| `ANTHROPIC_API_KEY` is missing or empty | The step fails with a message saying to add the secret, without running Claude. (GitHub passes a missing secret as an empty string, and Claude Code would only say "Not logged in".) |
+| The PR contains a `.pr-review` folder, file or symbolic link | It's removed and replaced; a symbolic link isn't followed. |
+| The PR contains `CLAUDE.md`, `.claude/settings.json`, `.mcp.json`, `uv.toml` or `.python-version` | Claude Code and uv ignore them. Claude reads `CLAUDE.md` or `REVIEW.md` as review rules, through the Read tool. |
+| A GitHub API call fails | The step fails with the method, path and HTTP status. |
+
+**When Claude finishes**
+
+| Situation | What happens |
+|---|---|
+| Claude reports an error, runs out of turns, or prints text instead of JSON (for example, no API credit) | The step fails with Claude's message, and nothing is posted. A failed review never looks like a review with no findings. |
+| No findings | No review is posted; the summary says there were none. |
+
+**When findings are posted**
+
+| Situation | What happens |
+|---|---|
+| A finding is on a line that isn't in the diff, or in a deleted or unknown file | It goes in the summary, under "Findings that could not be attached to a diff line". |
+| A finding covers lines in two different hunks, or its start is after its end | It's posted on its last line only. |
+| GitHub rejects the review | Every finding goes in the summary, without the hidden marker, and the run gives a warning. |
+| A file name has a space or unusual characters (`my notes.txt`, `café.py`) | Comments attach as normal: the name is decoded from the diff. |
+| An earlier summary exists | The new summary is posted first, then old summaries from the same account are deleted. Other people's and other bots' comments, and quotes of a summary, are kept. If a delete fails, the run gives a warning. |
+
+**Earlier findings**
+
+| Situation | What happens |
+|---|---|
+| An earlier finding has no replies | It's resolved. The default token can't resolve threads, so instead it gets a **Superseded** note; people resolve it once checked. A finding already marked is left alone. |
+| An earlier finding has replies | The thread is left open. Replies from owners, members and collaborators go to Claude, so it doesn't raise the finding again; other replies don't. |
+| Someone replies to, or resolves, a thread during the review | The thread is checked again just before it's changed, and left alone. |
+| That check fails | The thread is skipped with a warning; the new findings are still posted. |
+| A thread was started by a person with a copied marker | It's ignored: only threads a bot started count. |
+| The token is a personal access token | Summaries work, but earlier findings come from a person, so they aren't superseded or given to Claude. Use the default token or an app token. |
+| The PR has more than 100 comments or review threads | Every page is read. |
 
 ## Tests
 

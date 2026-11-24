@@ -8,6 +8,54 @@ Each run posts its findings as one review, on lines in the diff, and a summary c
 
 How the action works, its security restrictions and its tests: see the action's [README](../../.github/actions/claude-review/README.md).
 
+## Set up a repository
+
+1. **Create an API key** in the [Claude Console](https://console.anthropic.com). Use a workspace of its own with a monthly spend limit: the limit caps the cost of a busy month, or of a leaked key.
+
+2. **Add it as a secret** named `ANTHROPIC_API_KEY`: in the repository, Settings → Secrets and variables → Actions → New repository secret. An organisation secret works too, if the repository has access to it.
+
+3. **Add the workflow** as `.github/workflows/check.claude-review.yml`, copied from [the sample](../../samples/check.claude-review.yaml):
+
+   ```yaml
+   name: Claude PR review
+
+   on:
+     pull_request:
+       # labeled: adding the claude-review label requests a review.
+       types: [opened, synchronize, ready_for_review, labeled]
+
+   permissions: {}
+
+   jobs:
+     claude:
+       uses: health-informatics-uon/workflows/.github/workflows/claude-review.yml@<sha> # <version>
+       permissions:
+         contents: read
+         pull-requests: write
+       secrets:
+         ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+   ```
+
+   - Replace `<sha>` and `<version>` with a release that includes this workflow (see [pinning](dependabot.md#pinning-strategy)). Don't use `@main`: it changes without review, and this workflow gets your API key.
+   - Pass the secret by name, as above, not with `secrets: inherit`, so Claude Code gets only this secret.
+   - `pull-requests: write` lets it post comments; `contents: read` stops it pushing.
+
+4. **Create the label** (optional), for reviews on demand, including on drafts:
+
+   ```sh
+   gh label create claude-review --description "Request a Claude review"
+   ```
+
+   Adding a label needs triage access. Without the label, or without `labeled` in the trigger, pull requests are still reviewed automatically.
+
+5. **Add review rules** (optional): a `REVIEW.md` (or `CLAUDE.md`) at the repository root. Claude applies it, and it wins over the [general standards](../../.github/actions/claude-review/prompt/standards.md).
+
+6. **Keep the version up to date** with Dependabot's `github-actions` updates (see [Dependabot](dependabot.md)).
+
+7. **Check it works:** open a pull request. A `claude / review` check runs and, after a few minutes, a summary comment appears. If the check fails with "ANTHROPIC_API_KEY is empty", the secret is missing or isn't passed under `secrets:`.
+
+If your organisation allows only selected actions, allow the ones the workflow uses: `actions/checkout`, `actions/setup-node` and `astral-sh/setup-uv`.
+
 ## Disagreeing with a finding
 
 Reply to the finding to say why, then resolve it or leave it open. Later reviews get your reply and won't raise the finding again, unless the code changes in a way your reply doesn't cover. Only replies from owners, organisation members and collaborators count: anyone can comment on a public pull request.
@@ -31,33 +79,3 @@ Reply to the finding to say why, then resolve it or leave it open. Later reviews
 | `label`     | `claude-review`     | Label that requests a review. |
 
 All inputs are optional.
-
-## Secrets
-
-- `ANTHROPIC_API_KEY`: Claude Console API key, as a repository or organisation secret. Pass it explicitly, as below, not with `secrets: inherit`, so Claude Code gets only this secret.
-
-## Usage
-
-```yaml
-name: Claude PR Review
-
-on:
-  pull_request:
-    # labeled: adding the claude-review label requests a review.
-    types: [opened, synchronize, ready_for_review, labeled]
-
-permissions: {}
-
-jobs:
-  claude:
-    uses: health-informatics-uon/workflows/.github/workflows/claude-review.yml@<version>
-    permissions:
-      contents: read
-      pull-requests: write
-    secrets:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-```
-
-Replace `<version>` with a release tag that includes this workflow (see [pinning](dependabot.md#pinning-strategy)). Do not use `@main`: it changes without review, and this workflow gets your API key.
-
-For on-demand reviews, create the label (`gh label create claude-review`); adding labels needs triage access. Without it, or without `labeled` in the trigger, pull requests are still reviewed automatically.

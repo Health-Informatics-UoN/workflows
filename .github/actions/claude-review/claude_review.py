@@ -178,11 +178,17 @@ query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
 def fetch() -> None:
     """Gets the PR before Claude starts, so the review step needs no GitHub token.
 
-    The diff is for BASE_SHA...HEAD_SHA, the commits of the event, not the PR as it is
-    now. The checkout and post also use HEAD_SHA, so the code that Claude reads, the
-    diff that its line numbers refer to, and the commit that gets the comments are the
-    same, also if someone pushes during the review. PR comments aren't fetched: anyone
-    can post them. Only trusted replies to this action's findings go to Claude.
+    The diff is for BASE_SHA...HEAD_SHA, the commits of the event that started this run.
+    Usually they are also the PR's latest commits. If someone pushes after the run
+    starts, the push starts a new run for the new commit, and the reusable workflow
+    cancels this one (concurrency, cancel-in-progress). Until the cancel arrives, or if
+    the action is used without that setting, this run keeps to the event's commits:
+    the checkout and post also use HEAD_SHA, so the code that Claude reads, the diff
+    that its line numbers refer to, and the commit that gets the comments are always
+    the same.
+
+    PR comments aren't fetched: anyone can post them. Only trusted replies to this
+    action's findings go to Claude.
     """
     out = workspace() / ".pr-review"
     # Start empty: the PR can contain .pr-review, also as a symbolic link.
@@ -194,7 +200,8 @@ def fetch() -> None:
 
     repo, number = env("REPO"), int(env("PR_NUMBER"))
     with github() as gh:
-        # No list of changed files: it is for the PR as it is now. The diff shows them.
+        # No list of changed files: GitHub gives it for the PR's latest commit, which can
+        # be newer than HEAD_SHA after a push. The diff shows the files for HEAD_SHA.
         pr = call(gh, "GET", f"/repos/{repo}/pulls/{number}").json()
         details = {
             "title": pr["title"],
@@ -205,8 +212,21 @@ def fetch() -> None:
         }
         (out / "pr.json").write_text(json.dumps(details, indent=2) + "\n")
 
-        # Three dots: compare with the point where HEAD_SHA branched from BASE_SHA, as
-        # the PR does.
+        # The diff has only the changes that the PR makes, as on its "Files changed" tab.
+        # The PR branch starts from main at a commit (B, the merge base), and main can
+        # move on after that:
+        #
+        #   main:  A --- B --- C --- D    <- BASE_SHA
+        #                 \
+        #   PR:            X --- Y        <- HEAD_SHA
+        #
+        # Two dots (D..Y) compare the two ends: X and Y, plus C and D in reverse, because
+        # the PR branch doesn't have them. Claude would review code that the PR doesn't
+        # touch. Three dots (D...Y) compare Y with B: only X and Y.
+        #
+        # BASE_SHA and HEAD_SHA are from the event, not looked up again here, so a push
+        # after the run starts doesn't change the diff. The checkout and post use the same
+        # HEAD_SHA, so Claude's line numbers match the lines that get the comments.
         diff = call(gh, "GET", f"/repos/{repo}/compare/{env('BASE_SHA')}...{env('HEAD_SHA')}",
                     headers={"Accept": "application/vnd.github.diff"})
         (out / "pr.diff").write_bytes(diff.content)
