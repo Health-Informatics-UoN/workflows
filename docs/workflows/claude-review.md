@@ -2,7 +2,7 @@
 
 Reusable workflow that reviews a pull request with Claude Code. Claude runs read-only: it can read the checked-out code, but has no shell and no GitHub token.
 
-It reviews when a pull request is opened, gets new commits or is marked ready for review. To request a review at any other time, including on a draft, add the `claude-review` label; it is removed when the review finishes.
+It reviews when a pull request is opened, gets new commits or is marked ready for review. To request a review at any other time, including on a draft, add the `claude-review` label to the open pull request; it is removed when the review finishes. The label does nothing on a closed pull request.
 
 Each run posts its findings as one review, on lines in the diff, and a summary comment at the bottom of the pull request, replacing the previous summary. Findings from earlier runs that nobody replied to are marked **superseded**; resolve them when checked.
 
@@ -50,12 +50,14 @@ permissions: {}
 
 jobs:
   claude:
-    uses: health-informatics-uon/workflows/.github/workflows/claude-review.yml@main
+    uses: health-informatics-uon/workflows/.github/workflows/claude-review.yml@<version>
     permissions:
       contents: read
       pull-requests: write
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
+
+Replace `<version>` with a release tag that includes this workflow (see [pinning](dependabot.md#pinning-strategy)). Do not use `@main`: it changes without review, and this workflow gets your API key.
 
 For on-demand reviews, create the label (`gh label create claude-review`); adding labels needs triage access. Without it, or without `labeled` in the trigger, pull requests are still reviewed automatically.

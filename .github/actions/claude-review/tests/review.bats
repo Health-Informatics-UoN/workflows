@@ -69,6 +69,11 @@ has_arg_pair() {
   grep -qx -- "--strict-mcp-config" "$CLAUDE_ARGS"
 }
 
+@test "CLAUDE.md files, hooks and plugins are not loaded (--bare)" {
+  run bash "$ACTION_DIR/scripts/review.sh"
+  grep -qx -- "--bare" "$CLAUDE_ARGS"
+}
+
 @test "reading is allowed only inside the checkout, with secret locations denied" {
   run bash "$ACTION_DIR/scripts/review.sh"
   has_arg_pair --allowedTools "Read(./**),Grep(./**),Glob(./**)"

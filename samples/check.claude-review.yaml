@@ -13,6 +13,7 @@ permissions: {}
 
 jobs:
   claude:
+    # Replace <NEW_SHA> and <NEW_VERSION> with a release that includes claude-review.yml.
     uses: health-informatics-uon/workflows/.github/workflows/claude-review.yml@<NEW_SHA> # <NEW_VERSION>
     permissions:
       contents: read
