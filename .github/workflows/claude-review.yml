@@ -1,0 +1,104 @@
+# This is the reusable Claude PR review. Call it from a pull_request workflow (see
+# samples/check.claude-review.yaml). Give ANTHROPIC_API_KEY explicitly.
+#
+# The workflow does a review when a PR opens, gets new commits or becomes ready for
+# review, or when a person adds the review label (default `claude-review`). The label
+# requests a review at any time on an open PR, also on a draft, but not on a closed
+# PR. It is removed after the review, so that you can add it again. The caller trigger
+# must include the `labeled` type.
+name: Claude PR Review
+
+on:
+  workflow_call:
+    inputs:
+      # The defaults of model, max-lines, max-turns and effort are the same as in the
+      # action. .github/actions/claude-review/test_claude_review.py checks this.
+      # max-turns and max-lines are related. Claude uses turns to read files, so a
+      # larger PR needs more turns. If Claude uses all its turns, the review fails.
+      model:
+        description: Claude model to use.
+        type: string
+        default: claude-opus-5-5
+      max-lines:
+        description: Skip PRs with more changed lines (additions + deletions) than this.
+        type: number
+        default: 2000
+      max-turns:
+        description: Maximum number of Claude turns per review; limits cost.
+        type: number
+        default: 25
+      effort:
+        description: How much Claude thinks (low, medium, high, xhigh or max). Higher finds more, and costs more.
+        type: string
+        default: high
+      label:
+        description: Label that requests a review when added to a PR.
+        type: string
+        default: claude-review
+    secrets:
+      ANTHROPIC_API_KEY:
+        description: Claude Console API key.
+        required: true
+
+permissions: {}
+
+jobs:
+  review:
+    # Skip forks and Dependabot, because they have no secrets. The Dependabot check uses
+    # the PR author, not github.actor, so the job is still skipped if it runs again.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      (github.event.action == 'labeled'
+        && github.event.label.name == inputs.label
+        && github.event.pull_request.state == 'open'
+        || github.event.action != 'labeled'
+        && !github.event.pull_request.draft)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write # Lets the job post comments. contents: read stops pushes.
+    concurrency:
+      group: claude-review-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout PR code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Use the commit of the PR, not the GitHub test merge with the base branch.
+          # Thus, Claude reads the same code as the diff that its line numbers refer to.
+          # Also, the test merge does not exist when the PR has conflicts.
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          # Do not keep the GitHub token in .git/config. Claude can read that file.
+          persist-credentials: false
+
+      # $/ is the repository of this workflow, at the commit that runs. Thus, the action
+      # is always the same version as the workflow that the caller pinned. Real runs
+      # confirm this: the log shows "Run <repo>/.github/actions/claude-review@<commit>",
+      # with the same commit as the workflow.
+      - name: Claude review
+        uses: $/.github/actions/claude-review
+        with:
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: ${{ inputs.model }}
+          max-lines: ${{ inputs.max-lines }}
+          max-turns: ${{ inputs.max-turns }}
+          effort: ${{ inputs.effort }}
+
+      # Remove the label also if the review failed. Then a new label requests a review.
+      - name: Remove review label
+        if: always() && github.event.action == 'labeled'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          LABEL: ${{ inputs.label }}
+        # The REST endpoint accepts pull-requests: write. jq encodes the label name for
+        # the URL, for example a space as %20.
+        run: |
+          label_path=$(jq -rn --arg label "$LABEL" '$label | @uri')
+          gh api -X DELETE "repos/${REPO}/issues/${PR_NUMBER}/labels/${label_path}" > /dev/null \
+            || echo "::warning::Could not remove the $LABEL label"

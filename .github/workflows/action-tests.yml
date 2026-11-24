@@ -1,6 +1,6 @@
 # This workflow runs the unit tests for the Claude review action. It is
-# a self-check, not a reusable workflow. The tests use fake gh and claude commands, so
-# they need no secrets.
+# a self-check, not a reusable workflow. The tests use a fake GitHub and a fake Claude
+# Code, so they need no secrets.
 name: Action Tests
 
 on:
@@ -8,18 +8,20 @@ on:
     paths:
       - ".github/actions/**"
       - ".github/workflows/action-tests.yml"
+      - ".github/workflows/claude-review.yml"  # the defaults test reads it
   push:
     branches:
       - main
     paths:
       - ".github/actions/**"
       - ".github/workflows/action-tests.yml"
+      - ".github/workflows/claude-review.yml"  # the defaults test reads it
 
 permissions:
   contents: read
 
 jobs:
-  test:
+  claude-review:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
@@ -27,8 +29,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install bats
-        run: sudo apt-get update && sudo apt-get install -y bats
+      - name: Set up uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
 
       - name: Run the Claude review action tests
-        run: bats .github/actions/claude-review/tests
+        working-directory: .github/actions/claude-review
+        run: uv run --frozen pytest

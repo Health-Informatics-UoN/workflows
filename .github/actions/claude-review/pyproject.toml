@@ -1,0 +1,19 @@
+[project]
+name = "claude-review"
+version = "0.0.0"
+description = "Review a pull request with Claude Code and post the findings"
+requires-python = ">=3.13"
+dependencies = [
+    "httpx>=0.28.1",
+]
+
+[dependency-groups]
+# pyyaml: test_claude_review.py compares the defaults in action.yml and the workflow.
+dev = ["pytest>=9.2.0", "pyyaml>=6.0.3"]
+
+[tool.uv]
+# A script, not a package: action.yml runs claude_review.py directly.
+package = false
+
+[tool.pytest.ini_options]
+addopts = "-p no:cacheprovider"

@@ -34,21 +34,26 @@ inputs:
 runs:
   using: composite
   steps:
+    # uv installs the Python dependencies pinned in this action's uv.lock. With
+    # --project, uv reads its settings from this action's folder, so a uv.toml or
+    # .python-version in the PR's checkout is ignored.
+    - name: Set up uv
+      uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+
     - name: Check PR size
       id: size
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github-token }}
-        PR_URL: ${{ github.event.pull_request.html_url }}
         REPO: ${{ github.repository }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
         ADDITIONS: ${{ github.event.pull_request.additions }}
         DELETIONS: ${{ github.event.pull_request.deletions }}
         MAX_LINES: ${{ inputs.max-lines }}
-      run: bash "$GITHUB_ACTION_PATH/scripts/check-size.sh"
+      run: uv run --quiet --frozen --no-dev --project "$GITHUB_ACTION_PATH" python "$GITHUB_ACTION_PATH/claude_review.py" check-size
 
     # This step gets the PR, so the Claude step needs no GitHub token. It does not give
-    # Claude untrusted comments (refer to fetch-pr.sh).
+    # Claude untrusted comments (refer to fetch in claude_review.py).
     - name: Fetch PR
       if: steps.size.outputs.too-large == 'false'
       shell: bash
@@ -58,7 +63,7 @@ runs:
         PR_NUMBER: ${{ github.event.pull_request.number }}
         BASE_SHA: ${{ github.event.pull_request.base.sha }}
         HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-      run: bash "$GITHUB_ACTION_PATH/scripts/fetch-pr.sh"
+      run: uv run --quiet --frozen --no-dev --project "$GITHUB_ACTION_PATH" python "$GITHUB_ACTION_PATH/claude_review.py" fetch
 
     # Claude Code needs Node 22 or later. The default of the runner image changes over
     # time (it was Node 20 on Ubuntu 24.04), and self-hosted runners possibly do not
@@ -84,7 +89,7 @@ runs:
         MODEL: ${{ inputs.model }}
         MAX_TURNS: ${{ inputs.max-turns }}
         EFFORT: ${{ inputs.effort }}
-      run: bash "$GITHUB_ACTION_PATH/scripts/review.sh"
+      run: uv run --quiet --frozen --no-dev --project "$GITHUB_ACTION_PATH" python "$GITHUB_ACTION_PATH/claude_review.py" review
 
     - name: Post review comments
       if: steps.size.outputs.too-large == 'false'
@@ -94,4 +99,4 @@ runs:
         REPO: ${{ github.repository }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
         HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-      run: bash "$GITHUB_ACTION_PATH/scripts/post.sh"
+      run: uv run --quiet --frozen --no-dev --project "$GITHUB_ACTION_PATH" python "$GITHUB_ACTION_PATH/claude_review.py" post
