@@ -142,14 +142,14 @@ def test_traser_rejection_stops_push(dataset, gateway, capsys):
     gateway.traser_status = 400
     with pytest.raises(SystemExit):
         gp.main(["create", str(dataset), "--version", "1.0.0", *URLS])
-    assert "/summary: bad" in capsys.readouterr().err
+    assert "%0A  /summary: bad" in capsys.readouterr().out  # one ::error:: annotation
     assert all(r.url.host == "traser.test" for r in gateway.requests)
 
 
 def test_push_needs_dataset_id(dataset, gateway, capsys):
     with pytest.raises(SystemExit):
         gp.main(["push", str(dataset), "--version", "1.0.0", *URLS])
-    assert "run `create` once" in capsys.readouterr().err
+    assert "::error::gateway.yaml has no dataset_id" in capsys.readouterr().out
 
 
 def test_dry_run_sends_nothing(dataset, gateway, monkeypatch, capsys):

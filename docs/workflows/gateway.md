@@ -35,16 +35,6 @@ The metadata combines the LinkML schema (tables, columns and permitted values) w
        secrets: inherit
    ```
 
-   To create it from your machine instead, with the credentials in your shell:
-
-   ```sh
-   A=<workflows checkout>/.github/actions/gateway-publish
-   GATEWAY_APP_ID=... GATEWAY_CLIENT_ID=... \
-     uv run --frozen --project "$A" python "$A/gateway_publish.py" create . --version 0.0.0 \
-       --gateway-url https://api.healthdatagateway.org/api \
-       --traser-url https://hdr-gateway-traser-dev-qmnkcg5qjq-ew.a.run.app
-   ```
-
 5. **Call the workflow** on PRs and after releases:
 
    ```yaml
@@ -91,6 +81,7 @@ Secrets `GATEWAY_APP_ID` and `GATEWAY_CLIENT_ID` are needed only to publish or c
 
 ## Things to know
 
+- **Run it only through this workflow**, not from your machine: the `gateway` environment's approval is the check before anything reaches the Gateway.
 - **The repository is the only way to change the dataset.** The Gateway doesn't allow editing a dataset managed by an integration in its web UI, including its status. Every change to the metadata or the status goes through a PR and a release.
 - **Every release adds a Gateway version**, even if nothing changed. After publishing, the job reads the dataset back and fails unless the version went up and the title matches. A failed update isn't retried, because a retry could add a second version.
 - **To make a dataset public, or take it back to draft**, change `status` in `gateway.yaml` in a PR; the next release applies it.

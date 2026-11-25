@@ -1,5 +1,8 @@
 """Publish a dataset's metadata to the HDR UK Health Data Research Gateway.
 
+Run by the gateway-publish action in GitHub Actions, behind an environment approval; it
+isn't meant to be run locally. Errors are printed as ::error:: workflow commands.
+
 The payload (HDRUK 4.1.0) is built from a dataset directory:
   <name>.yaml or schemas/<name>.yaml   LinkML schema -> structuralMetadata
   gateway/metadata.yaml                hand-written catalogue fields, in HDRUK 4.1.0 shape
@@ -283,7 +286,8 @@ def main(argv: list[str] | None = None) -> None:
     try:
         {"validate": validate, "create": create, "push": push}[args.command](args)
     except Error as e:
-        print(f"error: {e}", file=sys.stderr)
+        # %0A keeps multi-line errors (e.g. TRASER's list) in one annotation.
+        print("::error::" + str(e).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A"), flush=True)
         sys.exit(1)
 
 
