@@ -1,8 +1,5 @@
 """Publish a dataset's metadata to the HDR UK Health Data Research Gateway.
 
-Run by the gateway-publish action in GitHub Actions, behind an environment approval; it
-isn't meant to be run locally. Errors are printed as ::error:: workflow commands.
-
 The payload (HDRUK 4.1.0) is built from a dataset directory:
   <name>.yaml or schemas/<name>.yaml   LinkML schema -> structuralMetadata
   gateway/metadata.yaml                hand-written catalogue fields, in HDRUK 4.1.0 shape
