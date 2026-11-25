@@ -1,0 +1,20 @@
+[project]
+name = "gateway-publish"
+version = "0.0.0"
+description = "Publish dataset metadata to the HDR UK Health Data Research Gateway"
+requires-python = ">=3.13"
+dependencies = [
+    "httpx>=0.28.1",
+    "linkml-runtime>=1.12.1",
+    "pyyaml>=6.0.3",
+]
+
+[dependency-groups]
+dev = ["pytest>=9.2.0"]
+
+[tool.uv]
+# A script, not a package: action.yml runs gateway_publish.py directly.
+package = false
+
+[tool.pytest.ini_options]
+addopts = "-p no:cacheprovider"

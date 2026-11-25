@@ -1,0 +1,72 @@
+name: HDR UK Gateway publish
+description: >-
+  Builds HDR UK Gateway metadata from a dataset repo's LinkML schema and gateway/ files,
+  validates it with TRASER, and with `command: push` sends it as a new version of the
+  dataset. Used by .github/workflows/gateway.yml; see gateway_publish.py for details.
+
+inputs:
+  command:
+    description: validate, create or push.
+    required: true
+  dataset-dir:
+    description: Directory holding gateway/.
+    default: "."
+  schema:
+    description: LinkML schema. Default the only *.yaml in dataset-dir, else in dataset-dir/schemas.
+    default: ""
+  version:
+    description: Metadata version, major.minor.patch (a leading v is removed). Required for create and push.
+    default: ""
+  status:
+    description: DRAFT or ACTIVE. Default the status in gateway.yaml.
+    default: ""
+  dry-run:
+    description: Print the request instead of sending it.
+    default: "false"
+  traser:
+    description: Validate with TRASER. false skips validation.
+    default: "true"
+  traser-url:
+    description: TRASER base URL.
+    required: true
+  base-url:
+    description: Gateway API base URL.
+    required: true
+  app-id:
+    description: The Private App's App ID (push only).
+    default: ""
+  client-id:
+    description: The Private App's Client ID (push only).
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    # uv installs the dependencies pinned in this action's uv.lock.
+    - name: Set up uv
+      uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+
+    # Inputs reach the script as environment variables, never interpolated into the shell.
+    - name: Run gateway_publish.py
+      shell: bash
+      env:
+        COMMAND: ${{ inputs.command }}
+        DATASET_DIR: ${{ inputs.dataset-dir }}
+        SCHEMA: ${{ inputs.schema }}
+        VERSION: ${{ inputs.version }}
+        STATUS: ${{ inputs.status }}
+        DRY_RUN: ${{ inputs.dry-run }}
+        TRASER: ${{ inputs.traser }}
+        TRASER_URL: ${{ inputs.traser-url }}
+        GATEWAY_URL: ${{ inputs.base-url }}
+        GATEWAY_APP_ID: ${{ inputs.app-id }}
+        GATEWAY_CLIENT_ID: ${{ inputs.client-id }}
+      run: |
+        args=("$COMMAND" "$DATASET_DIR" --gateway-url "$GATEWAY_URL" --traser-url "$TRASER_URL")
+        if [ -n "$VERSION" ]; then args+=(--version "$VERSION"); fi
+        if [ -n "$SCHEMA" ]; then args+=(--schema "$SCHEMA"); fi
+        if [ -n "$STATUS" ]; then args+=(--status "$STATUS"); fi
+        if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+        if [ "$TRASER" != "true" ]; then args+=(--skip-traser); fi
+        uv run --quiet --frozen --no-dev --project "$GITHUB_ACTION_PATH" \
+          python "$GITHUB_ACTION_PATH/gateway_publish.py" "${args[@]}"

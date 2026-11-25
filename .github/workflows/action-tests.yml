@@ -1,6 +1,6 @@
-# This workflow runs the unit tests for the Claude review action. It is
-# a self-check, not a reusable workflow. The tests use fake gh and claude commands, so
-# they need no secrets.
+# This workflow runs the unit tests for the actions in .github/actions. It is a
+# self-check, not a reusable workflow. The tests need no secrets: the Claude review tests
+# use fake gh and claude commands, and the gateway-publish tests mock the Gateway and TRASER.
 name: Action Tests
 
 on:
@@ -32,3 +32,18 @@ jobs:
 
       - name: Run the Claude review action tests
         run: bats .github/actions/claude-review/tests
+
+  gateway-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+
+      - name: Run the gateway-publish action tests
+        working-directory: .github/actions/gateway-publish
+        run: uv run --frozen pytest
